@@ -1,0 +1,239 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Background - Cinza muito suave */
+    --background: 240 5% 98%;
+    --foreground: 240 10% 10%;
+
+    /* Cards */
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    /* Primary - Apple Blue */
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 10%;
+
+    /* Muted */
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    /* Accent */
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 10% 10%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Border & Input */
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 211 100% 50%;
+
+    /* Radius */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Background - Preto suave */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+
+    /* Cards */
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 98%;
+
+    /* Popover */
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary - Apple Blue */
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary */
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Muted */
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+
+    /* Accent */
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Destructive */
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Success */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+
+    /* Border & Input */
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 211 100% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer base {
+  .bg-dot-white\/\[0\.15\] {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+  .bg-dot-black\/\[0\.08\] {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+}
+
+@layer utilities {
+  /* Smooth transitions */
+  .transition-smooth {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Scale on hover */
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-[1.02];
+  }
+
+  /* Press effect */
+  .press-effect {
+    @apply active:scale-[0.98] transition-transform duration-100;
+  }
+
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-white/70 dark:bg-black/70 backdrop-blur-md;
+  }
+
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Sidebar item active */
+  .sidebar-item-active {
+    @apply bg-gray-100 dark:bg-zinc-800 text-primary;
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Drop cap for reading */
+  .drop-cap::first-letter {
+    @apply float-left text-5xl font-bold mr-3 leading-none;
+  }
+
+  /* Stagger animation delays */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+
+  /* Animate on scroll/load */
+  .animate-on-load {
+    @apply animate-slide-up;
+    animation-fill-mode: both;
+  }
+
+  /* Interactive feedback */
+  .interactive {
+    @apply transition-all duration-200 cursor-pointer;
+  }
+  .interactive:hover {
+    @apply scale-[1.02];
+  }
+  .interactive:active {
+    @apply scale-[0.98];
+  }
+
+  /* Focus visible improvements */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+
+  /* Skeleton shimmer effect */
+  .skeleton {
+    @apply relative overflow-hidden bg-muted;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+    animation: shimmer 2s infinite;
+  }
+  .dark .skeleton::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.05),
+      transparent
+    );
+  }
+}
