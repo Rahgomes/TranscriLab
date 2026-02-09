@@ -1,29 +1,30 @@
-import type { Metadata } from 'next'
-import { Inter, Lora } from 'next/font/google'
-import { Toaster } from '@/components/ui/sonner'
-import './globals.css'
+import type { Metadata } from "next";
+import { Inter, Lora } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
+import "./globals.css";
 
 const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const lora = Lora({
-  subsets: ['latin'],
-  variable: '--font-lora',
-  display: 'swap',
-})
+  subsets: ["latin"],
+  variable: "--font-lora",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: 'TranscriLab - Transcricao de Audio com IA',
-  description: 'Converta audio em texto com inteligencia artificial. Transcreva, resuma e organize suas gravacoes.',
-}
+  title: "TranscriLab - Transcricao de Audio com IA",
+  description:
+    "Converta audio em texto com inteligencia artificial. Transcreva, resuma e organize suas gravacoes.",
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${lora.variable}`}>
@@ -38,5 +39,5 @@ export default function RootLayout({
         <Toaster richColors position="top-center" />
       </body>
     </html>
-  )
+  );
 }
