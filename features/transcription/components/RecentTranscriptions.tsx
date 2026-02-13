@@ -20,7 +20,7 @@ interface RecentTranscriptionsProps {
   limit?: number
 }
 
-export function RecentTranscriptions({ onSelectItem, limit = 4 }: RecentTranscriptionsProps) {
+export function RecentTranscriptions({ onSelectItem, limit = 6 }: RecentTranscriptionsProps) {
   const items = useHistoryStore((state) => state.items)
   const categories = useHistoryStore((state) => state.categories)
 
@@ -52,7 +52,7 @@ export function RecentTranscriptions({ onSelectItem, limit = 4 }: RecentTranscri
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {recentItems.map((item) => {
           const category = getCategoryInfo(item.category)
 

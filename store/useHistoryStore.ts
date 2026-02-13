@@ -5,6 +5,7 @@ import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import type { HistoryItem, HistoryCategory, SortBy, SortOrder } from '@/features/history/types'
 import type { SummaryData } from '@/features/summary/types'
+import type { TranscriptionSegment } from '@/features/transcription/types'
 import { DEFAULT_CATEGORIES } from '@/features/history/constants'
 import { deleteAudio, clearAllAudios } from '@/lib/audioStorage'
 
@@ -27,7 +28,7 @@ interface HistoryState {
   initialize: () => Promise<void>
 
   // Item actions (async - localStorage always, API when available)
-  addItem: (item: Omit<HistoryItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<HistoryItem>
+  addItem: (item: Omit<HistoryItem, 'id' | 'createdAt' | 'updatedAt'>, segments?: TranscriptionSegment[]) => Promise<HistoryItem>
   updateItem: (id: string, data: Partial<HistoryItem>) => Promise<void>
   updateItemSummary: (id: string, summary: SummaryData) => Promise<void>
   deleteItem: (id: string) => Promise<void>
@@ -134,11 +135,12 @@ export const useHistoryStore = create<HistoryState>()(
         },
 
         // Item actions — localStorage always (via persist), API when available
-        addItem: async (itemData) => {
+        addItem: async (itemData, segments) => {
           const now = new Date().toISOString()
           const newItem: HistoryItem = {
             id: crypto.randomUUID(),
             ...itemData,
+            segments: segments && segments.length > 0 ? segments : undefined,
             createdAt: now,
             updatedAt: now,
           }
@@ -163,6 +165,9 @@ export const useHistoryStore = create<HistoryState>()(
                   hasAudio: itemData.hasAudio,
                   audioMimeType: itemData.audioMimeType,
                   categoryId: itemData.category || null,
+                  hasDiarization: itemData.hasDiarization ?? false,
+                  speakerCount: itemData.speakerCount ?? null,
+                  segments: segments ?? [],
                 }),
               })
 

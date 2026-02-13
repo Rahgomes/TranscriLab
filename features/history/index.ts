@@ -8,6 +8,7 @@ export * from './constants'
 export { useHistoryStorage } from './hooks/useHistoryStorage'
 export { useHistorySearch } from './hooks/useHistorySearch'
 export { useCategories } from './hooks/useCategories'
+export { useSegments } from './hooks/useSegments'
 
 // Components
 export * from './components'

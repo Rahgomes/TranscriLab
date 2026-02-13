@@ -1,15 +1,16 @@
 'use client'
 
 import { useCallback, useRef } from 'react'
+import type { TranscriptionSegment, TranscriptionResult } from '@/features/transcription/types'
 
 interface TranscriptionCallbacks {
   onProgress?: (progress: number) => void
-  onComplete?: (text: string) => void
+  onComplete?: (result: TranscriptionResult) => void
   onError?: (error: string) => void
 }
 
 interface UseTranscriptionReturn {
-  transcribe: (file: File, callbacks: TranscriptionCallbacks) => Promise<string | null>
+  transcribe: (file: File, callbacks: TranscriptionCallbacks) => Promise<TranscriptionResult | null>
   abort: () => void
 }
 
@@ -42,7 +43,7 @@ export function useTranscription(): UseTranscriptionReturn {
   )
 
   const transcribe = useCallback(
-    async (file: File, callbacks: TranscriptionCallbacks): Promise<string | null> => {
+    async (file: File, callbacks: TranscriptionCallbacks): Promise<TranscriptionResult | null> => {
       const { onProgress, onComplete, onError } = callbacks
 
       abortControllerRef.current = new AbortController()
@@ -73,10 +74,17 @@ export function useTranscription(): UseTranscriptionReturn {
 
         const data = await response.json()
 
-        onProgress?.(100)
-        onComplete?.(data.text)
+        const result: TranscriptionResult = {
+          text: data.text,
+          segments: data.segments as TranscriptionSegment[] | undefined,
+          speakerCount: data.speakerCount as number | undefined,
+          hasDiarization: data.hasDiarization as boolean | undefined,
+        }
 
-        return data.text
+        onProgress?.(100)
+        onComplete?.(result)
+
+        return result
       } catch (error) {
         clearProgressInterval()
 

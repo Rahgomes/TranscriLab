@@ -17,6 +17,9 @@ export async function POST(request: NextRequest) {
       hasAudio,
       audioMimeType,
       categoryId,
+      hasDiarization,
+      speakerCount,
+      segments,
     } = body
 
     if (!fileName || !originalFileName || !fileSize || !text) {
@@ -41,6 +44,21 @@ export async function POST(request: NextRequest) {
         hasAudio: hasAudio ?? false,
         audioMimeType: audioMimeType ?? null,
         categoryId: categoryId ?? null,
+        hasDiarization: hasDiarization ?? false,
+        speakerCount: speakerCount ?? null,
+        segments: Array.isArray(segments) && segments.length > 0
+          ? {
+              createMany: {
+                data: segments.map((s: { index: number; speaker: string; text: string; startTime: number; endTime: number }, i: number) => ({
+                  index: s.index ?? i,
+                  speaker: s.speaker,
+                  text: s.text,
+                  startTime: s.startTime,
+                  endTime: s.endTime,
+                })),
+              },
+            }
+          : undefined,
       },
       include: {
         category: true,

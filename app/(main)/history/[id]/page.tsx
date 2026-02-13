@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Icon } from '@/components/ui/icon'
@@ -10,8 +10,17 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { AudioPlayerHandle } from '@/components/ui/audio-player'
 import { useHistoryStore } from '@/store'
-import { CategoryBadge, AudioPlayerWithLoader } from '@/features/history'
+import {
+  CategoryBadge,
+  AudioPlayerWithLoader,
+  SegmentedTranscript,
+  SpeakersList,
+  useSegments,
+} from '@/features/history'
+import { findActiveSegmentIndex } from '@/lib/segments'
 
 export default function TranscriptionDetailPage() {
   const params = useParams()
@@ -27,15 +36,42 @@ export default function TranscriptionDetailPage() {
   const [editedName, setEditedName] = useState('')
   const [copiedText, setCopiedText] = useState<'transcription' | 'summary' | null>(null)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1)
 
+  const audioPlayerRef = useRef<AudioPlayerHandle>(null)
   const item = items.find((i) => i.id === id)
   const category = item ? categories.find((c) => c.id === item.category) : null
+
+  // Carrega segmentos sob demanda para transcricoes com diarizacao
+  // Usa segments do localStorage como fonte primária, API como fallback
+  const { segments, speakers, isLoading: segmentsLoading } = useSegments(
+    item?.id,
+    item?.hasDiarization,
+    item?.segments,
+  )
 
   useEffect(() => {
     if (item) {
       setEditedName(item.fileName)
     }
   }, [item])
+
+  const handleTimeUpdate = useCallback(
+    (currentTime: number) => {
+      if (segments.length === 0) return
+      const index = findActiveSegmentIndex(segments, currentTime)
+      setActiveSegmentIndex(index)
+    },
+    [segments],
+  )
+
+  const handleSegmentClick = useCallback(
+    (startTime: number) => {
+      audioPlayerRef.current?.seekTo(startTime)
+      audioPlayerRef.current?.play()
+    },
+    [],
+  )
 
   if (!item) {
     return (
@@ -108,7 +144,22 @@ export default function TranscriptionDetailPage() {
 
   function handleExport() {
     if (!item) return
-    const content = `# ${item.fileName}\n\nData: ${new Date(item.createdAt).toLocaleString('pt-BR')}\n\n## Transcricao\n\n${item.transcription}${item.summary ? `\n\n## Resumo\n\n${item.summary.summary}\n\n## Insights\n\n${item.summary.insights.map((i) => `- ${i}`).join('\n')}` : ''}`
+
+    let transcriptionContent = item.transcription
+
+    // Se tiver diarizacao e segmentos carregados, exporta com speakers e timestamps
+    if (item.hasDiarization && segments.length > 0) {
+      transcriptionContent = segments
+        .map((s) => {
+          const mins = Math.floor(s.startTime / 60)
+          const secs = Math.floor(s.startTime % 60)
+          const ts = `${mins}:${secs.toString().padStart(2, '0')}`
+          return `[${ts}] **Speaker ${s.speaker}**: ${s.text}`
+        })
+        .join('\n\n')
+    }
+
+    const content = `# ${item.fileName}\n\nData: ${new Date(item.createdAt).toLocaleString('pt-BR')}\n${item.hasDiarization ? `Falantes: ${item.speakerCount ?? 'N/A'}\n` : ''}\n## Transcricao\n\n${transcriptionContent}${item.summary ? `\n\n## Resumo\n\n${item.summary.summary}\n\n## Insights\n\n${item.summary.insights.map((i) => `- ${i}`).join('\n')}` : ''}`
 
     const blob = new Blob([content], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
@@ -135,6 +186,8 @@ export default function TranscriptionDetailPage() {
       handleCopy('transcription')
     }
   }
+
+  const hasDiarization = item.hasDiarization && segments.length > 0
 
   return (
     <div className="min-h-screen">
@@ -225,6 +278,12 @@ export default function TranscriptionDetailPage() {
               {/* Meta info */}
               <div className="flex items-center gap-3 flex-wrap mb-8">
                 {category && <CategoryBadge name={category.name} color={category.color} />}
+                {item.hasDiarization && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Icon name="group" size="xs" className="mr-1" />
+                    {item.speakerCount ?? '?'} falantes
+                  </Badge>
+                )}
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
                   <Icon name="calendar_today" size="xs" />
                   {new Intl.DateTimeFormat('pt-BR', {
@@ -239,17 +298,35 @@ export default function TranscriptionDetailPage() {
                 </span>
               </div>
 
-              {/* Transcription text */}
-              <article className="prose prose-slate dark:prose-invert prose-lg max-w-none space-y-6">
-                {item.transcription.split(/\n\n+/).map((paragraph, index) => (
-                  <p
-                    key={index}
-                    className={`font-serif text-lg leading-relaxed ${index === 0 ? 'drop-cap' : ''}`}
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-              </article>
+              {/* Transcription content */}
+              {segmentsLoading && item.hasDiarization ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-16 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : hasDiarization ? (
+                <SegmentedTranscript
+                  segments={segments}
+                  speakers={speakers}
+                  activeSegmentIndex={activeSegmentIndex}
+                  onSegmentClick={handleSegmentClick}
+                />
+              ) : (
+                <article className="prose prose-slate dark:prose-invert prose-lg max-w-none space-y-6">
+                  {item.transcription.split(/\n\n+/).map((paragraph, index) => (
+                    <p
+                      key={index}
+                      className={`font-serif text-lg leading-relaxed ${index === 0 ? 'drop-cap' : ''}`}
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+                </article>
+              )}
 
               {/* End marker */}
               <div className="flex items-center gap-4 mt-12 text-muted-foreground">
@@ -264,6 +341,28 @@ export default function TranscriptionDetailPage() {
           <aside className="lg:w-96 bg-muted/30 border-t lg:border-t-0">
             <ScrollArea className="h-auto lg:h-[calc(100vh-73px)]">
               <div className="p-6 lg:p-8 space-y-6">
+                {/* Audio Player */}
+                {item.hasAudio && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Icon name="headphones" size="md" className="text-primary" />
+                        Audio Enviado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <AudioPlayerWithLoader
+                        ref={audioPlayerRef}
+                        historyId={item.id}
+                        onTimeUpdate={handleTimeUpdate}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Speakers list */}
+                {hasDiarization && <SpeakersList speakers={speakers} />}
+
                 {/* Summary section */}
                 {item.summary ? (
                   <>
@@ -351,21 +450,6 @@ export default function TranscriptionDetailPage() {
                   </Card>
                 )}
 
-                {/* Audio Player */}
-                {item.hasAudio && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Icon name="headphones" size="md" className="text-primary" />
-                        Audio Enviado
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <AudioPlayerWithLoader historyId={item.id} />
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* File info */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -402,6 +486,17 @@ export default function TranscriptionDetailPage() {
                         {item.transcription.length.toLocaleString()}
                       </span>
                     </div>
+                    {item.hasDiarization && (
+                      <>
+                        <Separator />
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Segmentos</span>
+                          <span className="font-medium">
+                            {segments.length || '...'}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>

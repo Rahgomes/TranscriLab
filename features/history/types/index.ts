@@ -1,4 +1,5 @@
 import type { SummaryData } from '@/features/summary/types'
+import type { TranscriptionSegment } from '@/features/transcription/types'
 
 export interface HistoryItem {
   id: string
@@ -13,6 +14,9 @@ export interface HistoryItem {
   updatedAt: string
   hasAudio?: boolean
   audioMimeType?: string
+  hasDiarization?: boolean
+  speakerCount?: number
+  segments?: TranscriptionSegment[]
 }
 
 export interface HistoryCategory {

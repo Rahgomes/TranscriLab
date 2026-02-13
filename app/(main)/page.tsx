@@ -4,11 +4,12 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Icon } from '@/components/ui/icon'
 import { FAB } from '@/components/ui/fab'
 import { FlipWords } from '@/components/ui/flip-words'
 import { MovingBorderButton } from '@/components/ui/moving-border'
-import { MultiStepLoader } from '@/components/ui/multi-step-loader'
+import type { TranscriptionSegment } from '@/features/transcription/types'
 import {
   AudioUploader,
   AudioFileList,
@@ -26,14 +27,6 @@ const heroWords = [
   'em poucos segundos',
   'de forma simples',
   'com precisao',
-]
-
-const loadingStates = [
-  { text: 'Preparando arquivo...' },
-  { text: 'Enviando para processamento...' },
-  { text: 'Transcrevendo audio...' },
-  { text: 'Analisando conteudo...' },
-  { text: 'Finalizando transcricao...' },
 ]
 
 export default function Home() {
@@ -54,13 +47,23 @@ export default function Home() {
   const { summary, isGenerating, error: summaryError, generateSummary, clearSummary } = useSummary()
   const addItem = useHistoryStore((state) => state.addItem)
   const updateItemSummary = useHistoryStore((state) => state.updateItemSummary)
-  const count = useHistoryStore((state) => state.items.length)
+  const items = useHistoryStore((state) => state.items)
+  const count = items.length
+
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    fileName: string
+    historyId: string
+    pendingFiles: File[]
+  } | null>(null)
 
   const [currentTranscription, setCurrentTranscription] = useState<{
     text: string
     fileName: string
     fileSize: number
     historyId: string
+    segments?: TranscriptionSegment[]
+    hasDiarization?: boolean
+    speakerCount?: number
   } | null>(null)
 
   // Atualiza o resumo no histórico quando for gerado
@@ -69,6 +72,24 @@ export default function Home() {
       updateItemSummary(currentTranscription.historyId, summary)
     }
   }, [summary, currentTranscription?.historyId, updateItemSummary])
+
+  const handleFilesSelected = useCallback((newFiles: File[]) => {
+    // Verifica se algum arquivo já foi transcrito anteriormente
+    for (const file of newFiles) {
+      const existing = items.find(
+        (item) => item.originalFileName === file.name && item.fileSize === file.size,
+      )
+      if (existing) {
+        setDuplicateInfo({
+          fileName: file.name,
+          historyId: existing.id,
+          pendingFiles: newFiles,
+        })
+        return
+      }
+    }
+    addFiles(newFiles)
+  }, [items, addFiles])
 
   const processFiles = useCallback(async () => {
     const pendingFiles = files.filter((f) => f.status === 'pending')
@@ -83,18 +104,23 @@ export default function Home() {
             updateFileStatus(fileState.id, 'transcribing')
           }
         },
-        onComplete: async (text) => {
-          updateFileStatus(fileState.id, 'completed', { transcription: text })
+        onComplete: async (result) => {
+          updateFileStatus(fileState.id, 'completed', { transcription: result.text })
 
           // Salva automaticamente no histórico (via API)
-          const historyItem = await addItem({
-            fileName: fileState.name,
-            originalFileName: fileState.name,
-            fileSize: fileState.size,
-            transcription: text,
-            hasAudio: true,
-            audioMimeType: fileState.file.type,
-          })
+          const historyItem = await addItem(
+            {
+              fileName: fileState.name,
+              originalFileName: fileState.name,
+              fileSize: fileState.size,
+              transcription: result.text,
+              hasAudio: true,
+              audioMimeType: fileState.file.type,
+              hasDiarization: result.hasDiarization,
+              speakerCount: result.speakerCount,
+            },
+            result.segments,
+          )
 
           // Salva o áudio no IndexedDB
           try {
@@ -104,10 +130,13 @@ export default function Home() {
           }
 
           setCurrentTranscription({
-            text,
+            text: result.text,
             fileName: fileState.name,
             fileSize: fileState.size,
             historyId: historyItem.id,
+            segments: result.segments,
+            hasDiarization: result.hasDiarization,
+            speakerCount: result.speakerCount,
           })
 
           toast.success(`${fileState.name} transcrito e salvo no historico!`)
@@ -150,14 +179,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Multi Step Loader - fullscreen overlay during processing */}
-      <MultiStepLoader
-        loadingStates={loadingStates}
-        loading={isProcessing}
-        duration={2500}
-        loop={true}
-      />
-
       <div className="w-full py-8 md:py-12">
         {/* Header with FlipWords */}
         <header className="text-center mb-12">
@@ -178,9 +199,52 @@ export default function Home() {
         <main className="space-y-8">
           {showUploader && (
             <AudioUploader
-              onFilesSelected={addFiles}
+              onFilesSelected={handleFilesSelected}
               disabled={isProcessing}
             />
+          )}
+
+          {duplicateInfo && (
+            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <Icon name="warning" size="md" className="text-amber-500" />
+              <AlertTitle className="text-amber-700 dark:text-amber-400">
+                Áudio já transcrito
+              </AlertTitle>
+              <AlertDescription className="mt-2 space-y-3">
+                <p className="text-muted-foreground">
+                  O arquivo <span className="font-medium text-foreground">{duplicateInfo.fileName}</span> já foi transcrito anteriormente.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/history/${duplicateInfo.historyId}`)}
+                    className="rounded-xl"
+                  >
+                    <Icon name="arrow_forward" size="sm" className="mr-2" />
+                    Ir para a transcrição
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      addFiles(duplicateInfo.pendingFiles)
+                      setDuplicateInfo(null)
+                    }}
+                    className="rounded-xl"
+                  >
+                    Transcrever mesmo assim
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDuplicateInfo(null)}
+                    className="rounded-xl"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           {showFileList && (
@@ -221,6 +285,8 @@ export default function Home() {
               <TranscriptionCard
                 text={currentTranscription.text}
                 fileName={currentTranscription.fileName}
+                segments={currentTranscription.segments}
+                hasDiarization={currentTranscription.hasDiarization}
                 onClear={handleClearTranscription}
               />
 
@@ -237,7 +303,7 @@ export default function Home() {
           {showRecentTranscriptions && (
             <RecentTranscriptions
               onSelectItem={handleSelectHistoryItem}
-              limit={4}
+              limit={6}
             />
           )}
         </main>

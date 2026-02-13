@@ -109,6 +109,12 @@ export function HistoryItemCard({
                 {category && (
                   <CategoryBadge name={category.name} color={category.color} />
                 )}
+                {item.hasDiarization && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                    <Icon name="group" size="xs" />
+                    {item.speakerCount ?? '?'} falantes
+                  </span>
+                )}
                 {item.summary && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-success/10 text-success px-2 py-0.5 rounded-full">
                     <Icon name="auto_awesome" size="xs" />

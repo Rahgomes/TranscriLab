@@ -41,6 +41,8 @@ model Transcription {
   status           TranscriptionStatus @default(COMPLETED)
   hasAudio         Boolean             @default(false)
   audioMimeType    String?             @db.VarChar(100)
+  hasDiarization   Boolean             @default(false)
+  speakerCount     Int?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
@@ -49,11 +51,29 @@ model Transcription {
 
   summary   Summary?
   audioFile AudioFile?
+  segments  TranscriptionSegment[]
 
   @@index([categoryId])
   @@index([createdAt(sort: Desc)])
   @@index([fileName])
   @@map("transcriptions")
+}
+
+model TranscriptionSegment {
+  id        String @id @default(uuid())
+  index     Int
+  speaker   String @db.VarChar(50)
+  text      String @db.Text
+  startTime Float
+  endTime   Float
+
+  transcriptionId String
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@index([transcriptionId, index])
+  @@index([transcriptionId, startTime])
+  @@map("transcription_segments")
 }
 
 model Summary {

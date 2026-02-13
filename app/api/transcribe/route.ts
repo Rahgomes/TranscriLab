@@ -35,12 +35,32 @@ export async function POST(request: NextRequest) {
 
     const transcription = await openai.audio.transcriptions.create({
       file: file,
-      model: 'gpt-4o-transcribe',
+      model: 'gpt-4o-transcribe-diarize',
       language: 'pt',
-      response_format: 'json',
-    })
+      response_format: 'diarized_json' as unknown as 'json',
+      chunking_strategy: 'auto',
+    } as Parameters<typeof openai.audio.transcriptions.create>[0])
 
-    return NextResponse.json({ text: transcription.text })
+    // Extrair segmentos da resposta diarizada
+    const rawSegments = (transcription as unknown as { segments?: Array<{ speaker: string; text: string; start: number; end: number }> }).segments ?? []
+
+    const segments = rawSegments.map((s, i) => ({
+      index: i,
+      speaker: s.speaker,
+      text: s.text,
+      startTime: s.start,
+      endTime: s.end,
+    }))
+
+    const fullText = rawSegments.map((s) => s.text).join(' ')
+    const speakers = new Set(rawSegments.map((s) => s.speaker))
+
+    return NextResponse.json({
+      text: fullText,
+      segments,
+      speakerCount: speakers.size,
+      hasDiarization: segments.length > 0,
+    })
   } catch (error) {
     console.error('Erro na transcrição:', error)
 

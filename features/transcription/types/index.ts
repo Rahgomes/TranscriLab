@@ -12,8 +12,20 @@ export interface AudioFileState {
   createdAt: Date
 }
 
+export interface TranscriptionSegment {
+  id?: string
+  index: number
+  speaker: string
+  text: string
+  startTime: number
+  endTime: number
+}
+
 export interface TranscriptionResult {
   text: string
   duration?: number
   language?: string
+  segments?: TranscriptionSegment[]
+  speakerCount?: number
+  hasDiarization?: boolean
 }

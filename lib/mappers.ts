@@ -2,13 +2,16 @@ import type {
   Transcription,
   Category,
   Summary,
+  TranscriptionSegment as PrismaSegment,
 } from '@prisma/client'
 import type { HistoryItem, HistoryCategory } from '@/features/history/types'
 import type { SummaryData } from '@/features/summary/types'
+import type { TranscriptionSegment } from '@/features/transcription/types'
 
 type TranscriptionWithRelations = Transcription & {
   category: Category | null
   summary: Summary | null
+  segments?: PrismaSegment[]
 }
 
 export function mapTranscriptionToHistoryItem(
@@ -27,7 +30,20 @@ export function mapTranscriptionToHistoryItem(
     updatedAt: t.updatedAt.toISOString(),
     hasAudio: t.hasAudio,
     audioMimeType: t.audioMimeType ?? undefined,
+    hasDiarization: t.hasDiarization,
+    speakerCount: t.speakerCount ?? undefined,
   }
+}
+
+export function mapSegments(segments: PrismaSegment[]): TranscriptionSegment[] {
+  return segments.map((s) => ({
+    id: s.id,
+    index: s.index,
+    speaker: s.speaker,
+    text: s.text,
+    startTime: s.startTime,
+    endTime: s.endTime,
+  }))
 }
 
 export function mapSummaryToSummaryData(s: Summary): SummaryData {
