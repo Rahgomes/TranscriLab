@@ -27,7 +27,8 @@ export default function HistoryPage() {
   const updateCat = useHistoryStore((state) => state.updateCategory)
   const deleteCategory = useHistoryStore((state) => state.deleteCategory)
   const count = items.length
-  const isLoading = false
+  const isLoading = useHistoryStore((state) => state.isLoading)
+  const isInitialized = useHistoryStore((state) => state.isInitialized)
   const {
     filteredItems,
     filters,
@@ -49,10 +50,8 @@ export default function HistoryPage() {
   async function handleGenerateSummary(item: HistoryItem) {
     setIsGeneratingSummary(true)
     try {
-      const response = await fetch('/api/summarize', {
+      const response = await fetch(`/api/transcriptions/${item.id}/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: item.transcription }),
       })
 
       const data = await response.json()
@@ -61,24 +60,18 @@ export default function HistoryPage() {
         throw new Error(data.error || 'Erro ao gerar resumo')
       }
 
-      updateItemSummary(item.id, {
+      const summaryData = {
         summary: data.summary,
         insights: data.insights,
         tokensUsed: data.tokensUsed,
-        generatedAt: new Date(),
-      })
+        generatedAt: new Date(data.generatedAt),
+      }
+
+      updateItemSummary(item.id, summaryData)
 
       setSelectedItem((prev) =>
         prev?.id === item.id
-          ? {
-              ...prev,
-              summary: {
-                summary: data.summary,
-                insights: data.insights,
-                tokensUsed: data.tokensUsed,
-                generatedAt: new Date(),
-              },
-            }
+          ? { ...prev, summary: summaryData }
           : prev
       )
 
@@ -93,7 +86,7 @@ export default function HistoryPage() {
 
   const hasFilters = filters.search !== '' || filters.category !== undefined
 
-  if (isLoading) {
+  if (isLoading || !isInitialized) {
     return (
       <div className="min-h-screen">
         <div className="w-full py-8 md:py-12">

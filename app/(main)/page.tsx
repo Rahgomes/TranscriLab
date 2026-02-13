@@ -86,8 +86,8 @@ export default function Home() {
         onComplete: async (text) => {
           updateFileStatus(fileState.id, 'completed', { transcription: text })
 
-          // Salva automaticamente no histórico
-          const historyItem = addItem({
+          // Salva automaticamente no histórico (via API)
+          const historyItem = await addItem({
             fileName: fileState.name,
             originalFileName: fileState.name,
             fileSize: fileState.size,

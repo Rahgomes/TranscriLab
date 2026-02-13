@@ -80,10 +80,8 @@ export default function TranscriptionDetailPage() {
     if (!item) return
     setIsGeneratingSummary(true)
     try {
-      const response = await fetch('/api/summarize', {
+      const response = await fetch(`/api/transcriptions/${item.id}/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: item.transcription }),
       })
 
       const data = await response.json()
@@ -96,7 +94,7 @@ export default function TranscriptionDetailPage() {
         summary: data.summary,
         insights: data.insights,
         tokensUsed: data.tokensUsed,
-        generatedAt: new Date(),
+        generatedAt: new Date(data.generatedAt),
       })
 
       toast.success('Resumo gerado com sucesso!')

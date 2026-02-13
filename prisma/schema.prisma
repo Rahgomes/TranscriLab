@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// === Enums ===
+
+enum TranscriptionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  ERROR
+}
+
+// === Models ===
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  color     String   @db.VarChar(7)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transcriptions Transcription[]
+
+  @@map("categories")
+}
+
+model Transcription {
+  id               String              @id @default(uuid())
+  fileName         String              @db.VarChar(500)
+  originalFileName String              @db.VarChar(500)
+  fileSize         Int
+  duration         Float?
+  transcription    String              @db.Text
+  language         String?             @default("pt") @db.VarChar(10)
+  status           TranscriptionStatus @default(COMPLETED)
+  hasAudio         Boolean             @default(false)
+  audioMimeType    String?             @db.VarChar(100)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  summary   Summary?
+  audioFile AudioFile?
+
+  @@index([categoryId])
+  @@index([createdAt(sort: Desc)])
+  @@index([fileName])
+  @@map("transcriptions")
+}
+
+model Summary {
+  id          String   @id @default(uuid())
+  summary     String   @db.Text
+  insights    String[]
+  tokensUsed  Int      @default(0)
+  generatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transcriptionId String        @unique
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@map("summaries")
+}
+
+model AudioFile {
+  id        String   @id @default(uuid())
+  fileName  String   @db.VarChar(500)
+  mimeType  String   @db.VarChar(100)
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  transcriptionId String        @unique
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@map("audio_files")
+}

@@ -5,6 +5,8 @@ export {
   useHistoryCategories,
   useHistoryCount,
   useHistoryFilters,
+  useHistoryInitialized,
+  useDbAvailable,
 } from './useHistoryStore'
 
 // Upload Store
