@@ -1,13 +1,15 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { openai } from '@/lib/openai'
-import { jsonResponse, errorResponse, notFoundResponse } from '@/lib/api'
+import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
 import { mapSummaryToSummaryData } from '@/lib/mappers'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
+    if (!prisma) return dbUnavailableResponse()
+
     const { id } = await params
 
     // Buscar transcricao
