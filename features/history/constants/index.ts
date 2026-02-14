@@ -10,6 +10,8 @@ export const DEFAULT_CATEGORIES: HistoryCategory[] = [
   { id: 'meeting', name: 'Reuniao', color: '#f59e0b' },
 ]
 
+export const MAX_LOCAL_VERSIONS = 10
+
 export const CATEGORY_COLORS = [
   '#3b82f6', // blue
   '#10b981', // emerald

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
 import { ACCEPTED_AUDIO_FORMATS, MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from '@/features/transcription'
 import { ERROR_CODES, ERROR_MESSAGES, handleApiError } from '@/lib/errors'
+import { detectAllEvents } from '@/lib/audioEvents'
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,11 +56,16 @@ export async function POST(request: NextRequest) {
     const fullText = rawSegments.map((s) => s.text).join(' ')
     const speakers = new Set(rawSegments.map((s) => s.speaker))
 
+    // Detectar eventos de audio via heuristica (custo zero, <10ms)
+    const events = detectAllEvents(segments)
+
     return NextResponse.json({
       text: fullText,
       segments,
       speakerCount: speakers.size,
       hasDiarization: segments.length > 0,
+      events,
+      hasEvents: events.length > 0,
     })
   } catch (error) {
     console.error('Erro na transcrição:', error)

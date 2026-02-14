@@ -79,6 +79,8 @@ export function useTranscription(): UseTranscriptionReturn {
           segments: data.segments as TranscriptionSegment[] | undefined,
           speakerCount: data.speakerCount as number | undefined,
           hasDiarization: data.hasDiarization as boolean | undefined,
+          events: data.events ?? undefined,
+          hasEvents: data.hasEvents ?? false,
         }
 
         onProgress?.(100)

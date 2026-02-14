@@ -17,6 +17,8 @@ export interface TranscriptionSegment {
   index: number
   speaker: string
   text: string
+  originalText?: string
+  speakerLabel?: string
   startTime: number
   endTime: number
 }
@@ -28,4 +30,6 @@ export interface TranscriptionResult {
   segments?: TranscriptionSegment[]
   speakerCount?: number
   hasDiarization?: boolean
+  events?: import('@/features/history/types/events').AudioEvent[]
+  hasEvents?: boolean
 }

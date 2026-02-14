@@ -1,5 +1,7 @@
 import type { SummaryData } from '@/features/summary/types'
 import type { TranscriptionSegment } from '@/features/transcription/types'
+import type { AudioEvent } from './events'
+import type { LocalVersion } from './versions'
 
 export interface HistoryItem {
   id: string
@@ -17,6 +19,11 @@ export interface HistoryItem {
   hasDiarization?: boolean
   speakerCount?: number
   segments?: TranscriptionSegment[]
+  hasEvents?: boolean
+  events?: AudioEvent[]
+  originalTranscription?: string
+  currentVersion?: number
+  localVersions?: LocalVersion[]
 }
 
 export interface HistoryCategory {

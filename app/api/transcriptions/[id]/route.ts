@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
-import { mapTranscriptionToHistoryItem, mapSegments } from '@/lib/mappers'
+import { mapTranscriptionToHistoryItem, mapSegments, mapEvents } from '@/lib/mappers'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -17,6 +17,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         category: true,
         summary: true,
         segments: { orderBy: { index: 'asc' } },
+        events: { orderBy: { startTime: 'asc' } },
       },
     })
 
@@ -28,8 +29,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const segments = transcription.segments
       ? mapSegments(transcription.segments)
       : []
+    const events = transcription.events
+      ? mapEvents(transcription.events)
+      : []
 
-    return jsonResponse({ ...item, segments })
+    return jsonResponse({ ...item, segments, events })
   } catch (error) {
     console.error('Erro ao buscar transcricao:', error)
     return errorResponse('Erro interno ao buscar transcricao', 500)

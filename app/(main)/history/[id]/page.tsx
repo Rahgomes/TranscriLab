@@ -7,10 +7,19 @@ import { Icon } from '@/components/ui/icon'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { AudioPlayerHandle } from '@/components/ui/audio-player'
 import { useHistoryStore } from '@/store'
 import {
@@ -20,7 +29,15 @@ import {
   SpeakersList,
   useSegments,
 } from '@/features/history'
+import { EditableSegmentedTranscript } from '@/features/history/components/EditableSegmentedTranscript'
+import { EditorToolbar } from '@/features/history/components/EditorToolbar'
+import { VersionHistorySheet } from '@/features/history/components/VersionHistorySheet'
+import { EventsList } from '@/features/history/components/EventsList'
+import { useEvents } from '@/features/history/hooks/useEvents'
+import { useEditorState } from '@/features/history/hooks/useEditorState'
+import { useVersionHistory } from '@/features/history/hooks/useVersionHistory'
 import { findActiveSegmentIndex } from '@/lib/segments'
+import { findActiveEventIndex } from '@/lib/audioEvents'
 
 export default function TranscriptionDetailPage() {
   const params = useParams()
@@ -31,12 +48,18 @@ export default function TranscriptionDetailPage() {
   const categories = useHistoryStore((state) => state.categories)
   const renameFile = useHistoryStore((state) => state.renameFile)
   const updateItemSummary = useHistoryStore((state) => state.updateItemSummary)
+  const updateItemAfterEdit = useHistoryStore((state) => state.updateItemAfterEdit)
+  const dbAvailable = useHistoryStore((state) => state.dbAvailable)
+  const saveEditsLocally = useHistoryStore((state) => state.saveEditsLocally)
 
   const [isEditing, setIsEditing] = useState(false)
   const [editedName, setEditedName] = useState('')
   const [copiedText, setCopiedText] = useState<'transcription' | 'summary' | null>(null)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(-1)
+  const [activeEventIndex, setActiveEventIndex] = useState(-1)
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false)
+  const [showHistorySheet, setShowHistorySheet] = useState(false)
 
   const audioPlayerRef = useRef<AudioPlayerHandle>(null)
   const item = items.find((i) => i.id === id)
@@ -50,6 +73,19 @@ export default function TranscriptionDetailPage() {
     item?.segments,
   )
 
+  // Carrega eventos de audio
+  const { events } = useEvents(
+    item?.id,
+    item?.hasEvents,
+    item?.events,
+  )
+
+  // Editor state
+  const editor = useEditorState(segments, item?.transcription ?? '')
+
+  // Version history
+  const versionHistory = useVersionHistory(item?.id)
+
   useEffect(() => {
     if (item) {
       setEditedName(item.fileName)
@@ -58,11 +94,16 @@ export default function TranscriptionDetailPage() {
 
   const handleTimeUpdate = useCallback(
     (currentTime: number) => {
-      if (segments.length === 0) return
-      const index = findActiveSegmentIndex(segments, currentTime)
-      setActiveSegmentIndex(index)
+      if (segments.length > 0) {
+        const index = findActiveSegmentIndex(segments, currentTime)
+        setActiveSegmentIndex(index)
+      }
+      if (events.length > 0) {
+        const eventIdx = findActiveEventIndex(events, currentTime)
+        setActiveEventIndex(eventIdx)
+      }
     },
-    [segments],
+    [segments, events],
   )
 
   const handleSegmentClick = useCallback(
@@ -72,6 +113,107 @@ export default function TranscriptionDetailPage() {
     },
     [],
   )
+
+  // === Editor handlers ===
+  const handleToggleEditMode = useCallback(() => {
+    if (editor.isEditMode) {
+      if (editor.isDirty) {
+        setShowDiscardDialog(true)
+      } else {
+        editor.exitEditMode()
+      }
+    } else {
+      editor.enterEditMode()
+    }
+  }, [editor])
+
+  const handleDiscardEdits = useCallback(() => {
+    editor.exitEditMode()
+    setShowDiscardDialog(false)
+  }, [editor])
+
+  const handleSaveEdits = useCallback(async () => {
+    if (!item) return
+
+    editor.setIsSaving(true)
+    try {
+      const hasDiarizationSegments = item.hasDiarization && editor.editableSegments.length > 0
+
+      const payload = {
+        transcriptionText: hasDiarizationSegments
+          ? editor.editableSegments.map((s) => s.text).join('\n\n')
+          : editor.editableText,
+        segments: hasDiarizationSegments
+          ? editor.editableSegments.map((s) => ({
+              id: s.id,
+              index: s.index,
+              speaker: s.speaker,
+              speakerLabel: s.speakerLabel ?? null,
+              text: s.text,
+              startTime: s.startTime,
+              endTime: s.endTime,
+            }))
+          : undefined,
+      }
+
+      if (dbAvailable) {
+        // Fluxo DB: salvar via API
+        const res = await fetch(`/api/transcriptions/${item.id}/edit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Erro ao salvar edicoes')
+        }
+
+        const data = await res.json()
+
+        updateItemAfterEdit(item.id, {
+          transcription: data.transcription,
+          currentVersion: data.currentVersion,
+          segments: data.segments,
+        })
+
+        if (data.segments) {
+          editor.applyUpdatedSegments(data.segments)
+        }
+
+        toast.success(`Alteracoes salvas! Versao #${data.versionCreated} criada`)
+      } else {
+        // Fluxo local: salvar no localStorage
+        const result = saveEditsLocally(item.id, payload)
+        if (!result) throw new Error('Erro ao salvar edicoes localmente')
+
+        if (result.segments) {
+          editor.applyUpdatedSegments(result.segments)
+        }
+
+        toast.success(`Alteracoes salvas localmente! Versao #${result.versionCreated} criada`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao salvar'
+      toast.error(message)
+    } finally {
+      editor.setIsSaving(false)
+    }
+  }, [item, editor, updateItemAfterEdit, dbAvailable, saveEditsLocally])
+
+  const handleRestoreVersion = useCallback(async (versionNumber: number) => {
+    if (!item) return
+
+    const success = await versionHistory.restoreVersion(versionNumber)
+    if (success) {
+      toast.success(`Versao #${versionNumber} restaurada com sucesso!`)
+      if (dbAvailable) {
+        router.refresh()
+      }
+    } else {
+      toast.error('Erro ao restaurar versao')
+    }
+  }, [item, versionHistory, router, dbAvailable])
 
   if (!item) {
     return (
@@ -247,6 +389,31 @@ export default function TranscriptionDetailPage() {
 
             {/* Right side - Actions */}
             <div className="flex items-center gap-2">
+              {(item.currentVersion ?? 0) > 0 && !editor.isEditMode && (
+                <>
+                  <Badge variant="secondary" className="text-xs">
+                    Editado (v{item.currentVersion})
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowHistorySheet(true)}
+                    className="rounded-xl"
+                  >
+                    <Icon name="history" size="sm" className="mr-2" />
+                    Historico
+                  </Button>
+                </>
+              )}
+              <Button
+                variant={editor.isEditMode ? 'default' : 'outline'}
+                size="sm"
+                onClick={handleToggleEditMode}
+                className="rounded-xl"
+              >
+                <Icon name="edit_note" size="sm" className="mr-2" />
+                {editor.isEditMode ? 'Editando...' : 'Editar'}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -298,6 +465,23 @@ export default function TranscriptionDetailPage() {
                 </span>
               </div>
 
+              {/* Editor toolbar */}
+              {editor.isEditMode && (
+                <div className="mb-6">
+                  <EditorToolbar
+                    isDirty={editor.isDirty}
+                    isSaving={editor.isSaving}
+                    currentVersion={item.currentVersion ?? 0}
+                    onSave={handleSaveEdits}
+                    onDiscard={() => {
+                      if (editor.isDirty) setShowDiscardDialog(true)
+                      else editor.exitEditMode()
+                    }}
+                    onOpenHistory={() => setShowHistorySheet(true)}
+                  />
+                </div>
+              )}
+
               {/* Transcription content */}
               {segmentsLoading && item.hasDiarization ? (
                 <div className="space-y-4">
@@ -308,6 +492,22 @@ export default function TranscriptionDetailPage() {
                     </div>
                   ))}
                 </div>
+              ) : editor.isEditMode && hasDiarization ? (
+                <EditableSegmentedTranscript
+                  segments={editor.editableSegments}
+                  speakers={speakers}
+                  activeSegmentIndex={activeSegmentIndex}
+                  onSegmentClick={handleSegmentClick}
+                  onSegmentTextChange={editor.setSegmentText}
+                  onSpeakerLabelChange={editor.setSegmentSpeakerLabel}
+                  onTimestampChange={editor.setSegmentTimestamps}
+                />
+              ) : editor.isEditMode && !hasDiarization ? (
+                <Textarea
+                  value={editor.editableText}
+                  onChange={(e) => editor.setEditableText(e.target.value)}
+                  className="min-h-[400px] bg-muted/30 border-transparent focus:border-input text-lg leading-relaxed font-serif resize-none"
+                />
               ) : hasDiarization ? (
                 <SegmentedTranscript
                   segments={segments}
@@ -355,6 +555,8 @@ export default function TranscriptionDetailPage() {
                         ref={audioPlayerRef}
                         historyId={item.id}
                         onTimeUpdate={handleTimeUpdate}
+                        events={events}
+                        onEventClick={handleSegmentClick}
                       />
                     </CardContent>
                   </Card>
@@ -362,6 +564,15 @@ export default function TranscriptionDetailPage() {
 
                 {/* Speakers list */}
                 {hasDiarization && <SpeakersList speakers={speakers} />}
+
+                {/* Audio events list */}
+                {events.length > 0 && (
+                  <EventsList
+                    events={events}
+                    activeEventIndex={activeEventIndex}
+                    onEventClick={handleSegmentClick}
+                  />
+                )}
 
                 {/* Summary section */}
                 {item.summary ? (
@@ -504,6 +715,44 @@ export default function TranscriptionDetailPage() {
           </aside>
         </div>
       </div>
+
+      {/* Discard edits dialog */}
+      <Dialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Descartar alteracoes?</DialogTitle>
+            <DialogDescription>
+              Voce tem alteracoes nao salvas. Tem certeza que deseja descartar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDiscardDialog(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDiscardEdits}>
+              Descartar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version history sheet */}
+      <VersionHistorySheet
+        open={showHistorySheet}
+        onOpenChange={setShowHistorySheet}
+        versions={versionHistory.versions}
+        isLoading={versionHistory.isLoading}
+        isLoadingDetail={versionHistory.isLoadingDetail}
+        isRestoring={versionHistory.isRestoring}
+        selectedVersion={versionHistory.selectedVersion}
+        createdAt={item.createdAt}
+        onFetchVersions={versionHistory.fetchVersions}
+        onFetchSnapshot={versionHistory.fetchVersionSnapshot}
+        onRestore={handleRestoreVersion}
+        onClearSelectedVersion={versionHistory.clearSelectedVersion}
+        currentTranscriptionText={item.transcription}
+        currentSegments={segments.map((s) => ({ index: s.index, speaker: s.speaker, text: s.text }))}
+      />
     </div>
   )
 }

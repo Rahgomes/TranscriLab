@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils'
 import { Icon } from './icon'
 import { Button } from './button'
 import { Slider } from './slider'
+import type { AudioEvent } from '@/features/history/types/events'
+import { EventMarkers } from '@/features/history/components/EventMarkers'
 
 export interface AudioPlayerHandle {
   seekTo: (time: number) => void
@@ -17,6 +19,8 @@ interface AudioPlayerProps {
   fileName?: string
   className?: string
   onTimeUpdate?: (currentTime: number) => void
+  events?: AudioEvent[]
+  onEventClick?: (startTime: number) => void
 }
 
 function formatTime(seconds: number): string {
@@ -27,7 +31,7 @@ function formatTime(seconds: number): string {
 }
 
 export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
-  function AudioPlayer({ src, fileName, className, onTimeUpdate }, ref) {
+  function AudioPlayer({ src, fileName, className, onTimeUpdate, events, onEventClick }, ref) {
     const audioRef = useRef<HTMLAudioElement>(null)
     const [isPlaying, setIsPlaying] = useState(false)
     const [currentTime, setCurrentTime] = useState(0)
@@ -141,8 +145,8 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           </div>
         )}
 
-        {/* Progress bar */}
-        <div className="mb-3">
+        {/* Progress bar with event markers */}
+        <div className="mb-3 relative">
           <Slider
             value={[currentTime]}
             max={duration || 100}
@@ -151,6 +155,15 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
             disabled={!isLoaded}
             className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3 [&_[role=slider]]:bg-white [&_.bg-primary]:bg-white [&_[data-orientation=horizontal]]:h-1"
           />
+          {events && events.length > 0 && duration > 0 && (
+            <div className="absolute inset-x-0 top-0 h-[4px]">
+              <EventMarkers
+                events={events}
+                duration={duration}
+                onEventClick={onEventClick}
+              />
+            </div>
+          )}
         </div>
 
         {/* Time display */}

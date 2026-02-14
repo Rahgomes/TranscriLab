@@ -3,14 +3,17 @@
 import { useState, useEffect, forwardRef } from 'react'
 import { getAudio } from '@/lib/audioStorage'
 import { AudioPlayer, type AudioPlayerHandle } from '@/components/ui/audio-player'
+import type { AudioEvent } from '@/features/history/types/events'
 
 interface AudioPlayerWithLoaderProps {
   historyId: string
   onTimeUpdate?: (currentTime: number) => void
+  events?: AudioEvent[]
+  onEventClick?: (startTime: number) => void
 }
 
 export const AudioPlayerWithLoader = forwardRef<AudioPlayerHandle, AudioPlayerWithLoaderProps>(
-  function AudioPlayerWithLoader({ historyId, onTimeUpdate }, ref) {
+  function AudioPlayerWithLoader({ historyId, onTimeUpdate, events, onEventClick }, ref) {
     const [audioUrl, setAudioUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(false)
@@ -68,6 +71,14 @@ export const AudioPlayerWithLoader = forwardRef<AudioPlayerHandle, AudioPlayerWi
       )
     }
 
-    return <AudioPlayer ref={ref} src={audioUrl} onTimeUpdate={onTimeUpdate} />
+    return (
+      <AudioPlayer
+        ref={ref}
+        src={audioUrl}
+        onTimeUpdate={onTimeUpdate}
+        events={events}
+        onEventClick={onEventClick}
+      />
+    )
   }
 )

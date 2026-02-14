@@ -15,6 +15,15 @@ enum TranscriptionStatus {
   ERROR
 }
 
+enum AudioEventType {
+  LAUGHTER
+  APPLAUSE
+  MUSIC
+  SILENCE
+  CROSSTALK
+  OTHER
+}
+
 // === Models ===
 
 model Category {
@@ -31,20 +40,22 @@ model Category {
 }
 
 model Transcription {
-  id               String              @id @default(uuid())
-  fileName         String              @db.VarChar(500)
-  originalFileName String              @db.VarChar(500)
-  fileSize         Int
-  duration         Float?
-  transcription    String              @db.Text
-  language         String?             @default("pt") @db.VarChar(10)
-  status           TranscriptionStatus @default(COMPLETED)
-  hasAudio         Boolean             @default(false)
-  audioMimeType    String?             @db.VarChar(100)
-  hasDiarization   Boolean             @default(false)
-  speakerCount     Int?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id                        String              @id @default(uuid())
+  fileName                  String              @db.VarChar(500)
+  originalFileName          String              @db.VarChar(500)
+  fileSize                  Int
+  duration                  Float?
+  transcription             String              @db.Text
+  originalTranscriptionText String?             @db.Text
+  currentVersion            Int                 @default(0)
+  language                  String?             @default("pt") @db.VarChar(10)
+  status                    TranscriptionStatus @default(COMPLETED)
+  hasAudio                  Boolean             @default(false)
+  audioMimeType             String?             @db.VarChar(100)
+  hasDiarization            Boolean             @default(false)
+  speakerCount              Int?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -52,6 +63,9 @@ model Transcription {
   summary   Summary?
   audioFile AudioFile?
   segments  TranscriptionSegment[]
+  events    AudioEvent[]
+  versions  TranscriptionVersion[]
+  hasEvents Boolean             @default(false)
 
   @@index([categoryId])
   @@index([createdAt(sort: Desc)])
@@ -60,12 +74,14 @@ model Transcription {
 }
 
 model TranscriptionSegment {
-  id        String @id @default(uuid())
-  index     Int
-  speaker   String @db.VarChar(50)
-  text      String @db.Text
-  startTime Float
-  endTime   Float
+  id           String  @id @default(uuid())
+  index        Int
+  speaker      String  @db.VarChar(50)
+  text         String  @db.Text
+  originalText String? @db.Text
+  speakerLabel String? @db.VarChar(100)
+  startTime    Float
+  endTime      Float
 
   transcriptionId String
   transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
@@ -89,6 +105,42 @@ model Summary {
   transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
 
   @@map("summaries")
+}
+
+model AudioEvent {
+  id        String         @id @default(uuid())
+  type      AudioEventType
+  startTime Float
+  endTime   Float
+  confidence Float
+  description String?      @db.Text
+  source     String        @db.VarChar(50)
+  createdAt  DateTime      @default(now())
+
+  transcriptionId String
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@index([transcriptionId, startTime])
+  @@index([transcriptionId, type])
+  @@map("audio_events")
+}
+
+model TranscriptionVersion {
+  id              String   @id @default(uuid())
+  versionNumber   Int
+  editedAt        DateTime @default(now())
+  editorId        String?  @db.VarChar(100)
+  changesSummary  String   @db.Text
+  snapshot        Json     @db.JsonB
+
+  transcriptionId String
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([transcriptionId, versionNumber])
+  @@index([transcriptionId])
+  @@index([transcriptionId, editedAt])
+  @@map("transcription_versions")
 }
 
 model AudioFile {

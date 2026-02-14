@@ -6,8 +6,33 @@ import { immer } from 'zustand/middleware/immer'
 import type { HistoryItem, HistoryCategory, SortBy, SortOrder } from '@/features/history/types'
 import type { SummaryData } from '@/features/summary/types'
 import type { TranscriptionSegment } from '@/features/transcription/types'
-import { DEFAULT_CATEGORIES } from '@/features/history/constants'
+import type { AudioEvent } from '@/features/history/types/events'
+import type { VersionSummary, VersionDetail, VersionSnapshot } from '@/features/history/types/versions'
+import { DEFAULT_CATEGORIES, MAX_LOCAL_VERSIONS } from '@/features/history/constants'
 import { deleteAudio, clearAllAudios } from '@/lib/audioStorage'
+
+function createSnapshotFromItem(item: HistoryItem): VersionSnapshot {
+  return {
+    transcriptionText: item.transcription,
+    segments: (item.segments ?? []).map((s) => ({
+      index: s.index,
+      speaker: s.speaker,
+      speakerLabel: s.speakerLabel ?? null,
+      text: s.text,
+      originalText: s.originalText ?? null,
+      startTime: s.startTime,
+      endTime: s.endTime,
+    })),
+    events: (item.events ?? []).map((e) => ({
+      type: e.type,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      confidence: e.confidence,
+      description: e.description ?? null,
+      source: e.source,
+    })),
+  }
+}
 
 interface HistoryState {
   // State
@@ -28,13 +53,25 @@ interface HistoryState {
   initialize: () => Promise<void>
 
   // Item actions (async - localStorage always, API when available)
-  addItem: (item: Omit<HistoryItem, 'id' | 'createdAt' | 'updatedAt'>, segments?: TranscriptionSegment[]) => Promise<HistoryItem>
+  addItem: (item: Omit<HistoryItem, 'id' | 'createdAt' | 'updatedAt'>, segments?: TranscriptionSegment[], events?: AudioEvent[]) => Promise<HistoryItem>
   updateItem: (id: string, data: Partial<HistoryItem>) => Promise<void>
   updateItemSummary: (id: string, summary: SummaryData) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   renameFile: (id: string, newName: string) => Promise<void>
   updateItemCategory: (id: string, categoryId: string | undefined) => Promise<void>
   clearHistory: () => Promise<void>
+
+  // Editor actions
+  updateItemAfterEdit: (id: string, data: { transcription: string; currentVersion: number; segments?: TranscriptionSegment[] }) => void
+
+  // Local editing actions (when dbAvailable === false)
+  saveEditsLocally: (id: string, payload: {
+    transcriptionText: string
+    segments?: Array<{ index: number; speaker: string; speakerLabel: string | null; text: string; startTime: number; endTime: number }>
+  }) => { transcription: string; currentVersion: number; segments?: TranscriptionSegment[]; versionCreated: number } | null
+  getLocalVersions: (id: string) => VersionSummary[]
+  getLocalVersionSnapshot: (id: string, versionNumber: number) => VersionDetail | null
+  restoreLocalVersion: (id: string, versionNumber: number) => { currentVersion: number; transcription: string; segments?: TranscriptionSegment[] } | null
 
   // Category actions (async - localStorage always, API when available)
   addCategory: (name: string, color: string) => Promise<HistoryCategory>
@@ -135,12 +172,14 @@ export const useHistoryStore = create<HistoryState>()(
         },
 
         // Item actions — localStorage always (via persist), API when available
-        addItem: async (itemData, segments) => {
+        addItem: async (itemData, segments, events) => {
           const now = new Date().toISOString()
           const newItem: HistoryItem = {
             id: crypto.randomUUID(),
             ...itemData,
             segments: segments && segments.length > 0 ? segments : undefined,
+            events: events && events.length > 0 ? events : undefined,
+            hasEvents: events && events.length > 0 ? true : undefined,
             createdAt: now,
             updatedAt: now,
           }
@@ -168,6 +207,8 @@ export const useHistoryStore = create<HistoryState>()(
                   hasDiarization: itemData.hasDiarization ?? false,
                   speakerCount: itemData.speakerCount ?? null,
                   segments: segments ?? [],
+                  events: events ?? [],
+                  hasEvents: events && events.length > 0 ? true : false,
                 }),
               })
 
@@ -255,6 +296,167 @@ export const useHistoryStore = create<HistoryState>()(
 
         updateItemCategory: async (id, categoryId) => {
           await get().updateItem(id, { category: categoryId })
+        },
+
+        // Editor: update item after successful edit save
+        updateItemAfterEdit: (id, data) => {
+          set((state) => {
+            const index = state.items.findIndex((item) => item.id === id)
+            if (index !== -1) {
+              state.items[index].transcription = data.transcription
+              state.items[index].currentVersion = data.currentVersion
+              if (data.segments) {
+                state.items[index].segments = data.segments
+              }
+              state.items[index].updatedAt = new Date().toISOString()
+            }
+          })
+        },
+
+        // Local editing: save edits + create version snapshot in localStorage
+        saveEditsLocally: (id, payload) => {
+          const item = get().items.find((i) => i.id === id)
+          if (!item) return null
+
+          const snapshot = createSnapshotFromItem(item)
+          const newVersion = (item.currentVersion ?? 0) + 1
+
+          // Compute changes summary
+          let editedCount = 0
+          let renamedSpeakers = 0
+          if (payload.segments && item.segments) {
+            for (const seg of payload.segments) {
+              const original = item.segments.find((s) => s.index === seg.index)
+              if (original) {
+                if (seg.text !== original.text) editedCount++
+                if (seg.speakerLabel !== (original.speakerLabel ?? null)) renamedSpeakers++
+              }
+            }
+          } else if (payload.transcriptionText !== item.transcription) {
+            editedCount = 1
+          }
+
+          const parts: string[] = []
+          if (editedCount > 0) parts.push(`${editedCount} segmento(s) editado(s)`)
+          if (renamedSpeakers > 0) parts.push(`${renamedSpeakers} falante(s) renomeado(s)`)
+          const changesSummary = parts.length > 0 ? parts.join(', ') : 'Texto editado'
+
+          const localVersion: VersionDetail = {
+            id: crypto.randomUUID(),
+            versionNumber: item.currentVersion ?? 0,
+            editedAt: new Date().toISOString(),
+            changesSummary,
+            snapshot,
+          }
+
+          const newSegments: TranscriptionSegment[] | undefined = payload.segments?.map((s) => ({
+            index: s.index,
+            speaker: s.speaker,
+            speakerLabel: s.speakerLabel ?? undefined,
+            text: s.text,
+            startTime: s.startTime,
+            endTime: s.endTime,
+          }))
+
+          set((state) => {
+            const idx = state.items.findIndex((i) => i.id === id)
+            if (idx === -1) return
+
+            const versions = state.items[idx].localVersions ?? []
+            versions.push(localVersion)
+            if (versions.length > MAX_LOCAL_VERSIONS) {
+              versions.splice(0, versions.length - MAX_LOCAL_VERSIONS)
+            }
+            state.items[idx].localVersions = versions
+
+            state.items[idx].transcription = payload.transcriptionText
+            state.items[idx].currentVersion = newVersion
+            if (newSegments) {
+              state.items[idx].segments = newSegments
+            }
+            state.items[idx].updatedAt = new Date().toISOString()
+          })
+
+          return {
+            transcription: payload.transcriptionText,
+            currentVersion: newVersion,
+            segments: newSegments,
+            versionCreated: newVersion,
+          }
+        },
+
+        getLocalVersions: (id) => {
+          const item = get().items.find((i) => i.id === id)
+          if (!item?.localVersions) return []
+          return item.localVersions.map((v) => ({
+            id: v.id,
+            versionNumber: v.versionNumber,
+            editedAt: v.editedAt,
+            changesSummary: v.changesSummary,
+            editorId: v.editorId,
+          }))
+        },
+
+        getLocalVersionSnapshot: (id, versionNumber) => {
+          const item = get().items.find((i) => i.id === id)
+          return item?.localVersions?.find((v) => v.versionNumber === versionNumber) ?? null
+        },
+
+        restoreLocalVersion: (id, versionNumber) => {
+          const item = get().items.find((i) => i.id === id)
+          if (!item) return null
+
+          const targetVersion = item.localVersions?.find((v) => v.versionNumber === versionNumber)
+          if (!targetVersion) return null
+
+          const currentSnapshot = createSnapshotFromItem(item)
+          const newVersion = (item.currentVersion ?? 0) + 1
+
+          const backupVersion: VersionDetail = {
+            id: crypto.randomUUID(),
+            versionNumber: item.currentVersion ?? 0,
+            editedAt: new Date().toISOString(),
+            changesSummary: `Backup antes de restaurar versao #${versionNumber}`,
+            snapshot: currentSnapshot,
+          }
+
+          const restoredSegments: TranscriptionSegment[] | undefined =
+            targetVersion.snapshot.segments.length > 0
+              ? targetVersion.snapshot.segments.map((s) => ({
+                  index: s.index,
+                  speaker: s.speaker,
+                  speakerLabel: s.speakerLabel ?? undefined,
+                  text: s.text,
+                  originalText: s.originalText ?? undefined,
+                  startTime: s.startTime,
+                  endTime: s.endTime,
+                }))
+              : undefined
+
+          set((state) => {
+            const idx = state.items.findIndex((i) => i.id === id)
+            if (idx === -1) return
+
+            const versions = state.items[idx].localVersions ?? []
+            versions.push(backupVersion)
+            if (versions.length > MAX_LOCAL_VERSIONS) {
+              versions.splice(0, versions.length - MAX_LOCAL_VERSIONS)
+            }
+            state.items[idx].localVersions = versions
+
+            state.items[idx].transcription = targetVersion.snapshot.transcriptionText
+            state.items[idx].currentVersion = newVersion
+            if (restoredSegments) {
+              state.items[idx].segments = restoredSegments
+            }
+            state.items[idx].updatedAt = new Date().toISOString()
+          })
+
+          return {
+            currentVersion: newVersion,
+            transcription: targetVersion.snapshot.transcriptionText,
+            segments: restoredSegments,
+          }
         },
 
         clearHistory: async () => {

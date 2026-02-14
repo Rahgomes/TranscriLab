@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import type { AudioEventType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseSearchParams, dbUnavailableResponse } from '@/lib/api'
 import { mapTranscriptionToHistoryItem } from '@/lib/mappers'
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
       hasDiarization,
       speakerCount,
       segments,
+      events,
+      hasEvents,
     } = body
 
     if (!fileName || !originalFileName || !fileSize || !text) {
@@ -41,11 +44,14 @@ export async function POST(request: NextRequest) {
         fileSize,
         duration: duration ?? null,
         transcription: text,
+        originalTranscriptionText: text,
+        currentVersion: 0,
         hasAudio: hasAudio ?? false,
         audioMimeType: audioMimeType ?? null,
         categoryId: categoryId ?? null,
         hasDiarization: hasDiarization ?? false,
         speakerCount: speakerCount ?? null,
+        hasEvents: hasEvents ?? false,
         segments: Array.isArray(segments) && segments.length > 0
           ? {
               createMany: {
@@ -53,8 +59,23 @@ export async function POST(request: NextRequest) {
                   index: s.index ?? i,
                   speaker: s.speaker,
                   text: s.text,
+                  originalText: s.text,
                   startTime: s.startTime,
                   endTime: s.endTime,
+                })),
+              },
+            }
+          : undefined,
+        events: Array.isArray(events) && events.length > 0
+          ? {
+              createMany: {
+                data: events.map((e: { type: string; startTime: number; endTime: number; confidence: number; description?: string; source: string }) => ({
+                  type: e.type as AudioEventType,
+                  startTime: e.startTime,
+                  endTime: e.endTime,
+                  confidence: e.confidence,
+                  description: e.description ?? null,
+                  source: e.source,
                 })),
               },
             }
@@ -66,7 +87,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return jsonResponse(mapTranscriptionToHistoryItem(created), 201)
+    // Type assertion needed because Prisma loses type inference with complex conditional createMany
+    return jsonResponse(mapTranscriptionToHistoryItem(created as typeof created & { category: typeof created.category; summary: typeof created.summary }), 201)
   } catch (error) {
     console.error('Erro ao criar transcricao:', error)
     return errorResponse('Erro interno ao criar transcricao', 500)

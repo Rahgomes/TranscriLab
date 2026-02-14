@@ -118,8 +118,10 @@ export default function Home() {
               audioMimeType: fileState.file.type,
               hasDiarization: result.hasDiarization,
               speakerCount: result.speakerCount,
+              hasEvents: result.hasEvents,
             },
             result.segments,
+            result.events,
           )
 
           // Salva o áudio no IndexedDB
