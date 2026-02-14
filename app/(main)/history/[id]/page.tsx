@@ -51,6 +51,7 @@ export default function TranscriptionDetailPage() {
   const updateItemAfterEdit = useHistoryStore((state) => state.updateItemAfterEdit)
   const dbAvailable = useHistoryStore((state) => state.dbAvailable)
   const saveEditsLocally = useHistoryStore((state) => state.saveEditsLocally)
+  const deleteItem = useHistoryStore((state) => state.deleteItem)
 
   const [isEditing, setIsEditing] = useState(false)
   const [editedName, setEditedName] = useState('')
@@ -60,6 +61,7 @@ export default function TranscriptionDetailPage() {
   const [activeEventIndex, setActiveEventIndex] = useState(-1)
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
   const [showHistorySheet, setShowHistorySheet] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const audioPlayerRef = useRef<AudioPlayerHandle>(null)
   const item = items.find((i) => i.id === id)
@@ -329,6 +331,13 @@ export default function TranscriptionDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!item) return
+    await deleteItem(item.id)
+    toast.success('Transcricao excluida!')
+    router.push('/history')
+  }
+
   const hasDiarization = item.hasDiarization && segments.length > 0
 
   return (
@@ -430,6 +439,15 @@ export default function TranscriptionDetailPage() {
               <Button size="sm" onClick={handleShare} className="rounded-xl">
                 <Icon name="share" size="sm" className="mr-2" />
                 Compartilhar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                className="rounded-xl text-destructive hover:text-destructive"
+              >
+                <Icon name="delete" size="sm" className="mr-2" />
+                Excluir
               </Button>
             </div>
           </div>
@@ -731,6 +749,26 @@ export default function TranscriptionDetailPage() {
             </Button>
             <Button variant="destructive" onClick={handleDiscardEdits}>
               Descartar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir transcricao</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir &quot;{item.fileName}&quot;? Esta acao nao pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="rounded-xl">
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} className="rounded-xl">
+              Excluir
             </Button>
           </DialogFooter>
         </DialogContent>

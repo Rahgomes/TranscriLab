@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CardContent } from '@/components/ui/card'
@@ -56,8 +56,13 @@ export function HistoryItemCard({
   const [renameOpen, setRenameOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [newName, setNewName] = useState(item.fileName)
+  const isMenuAction = useRef(false)
 
   function handleNavigate() {
+    if (isMenuAction.current) {
+      isMenuAction.current = false
+      return
+    }
     router.push(`/history/${item.id}`)
   }
 
@@ -177,12 +182,12 @@ export function HistoryItemCard({
                   <Icon name="more_horiz" size="md" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <DropdownMenuItem onClick={handleNavigate}>
                   <Icon name="visibility" size="sm" className="mr-2" />
                   Ver detalhes
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRenameOpen(true)}>
+                <DropdownMenuItem onClick={() => { isMenuAction.current = true; setRenameOpen(true) }}>
                   <Icon name="edit" size="sm" className="mr-2" />
                   Renomear
                 </DropdownMenuItem>
@@ -220,7 +225,7 @@ export function HistoryItemCard({
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
-                  onClick={() => setDeleteOpen(true)}
+                  onClick={() => { isMenuAction.current = true; setDeleteOpen(true) }}
                   className="text-destructive focus:text-destructive"
                 >
                   <Icon name="delete" size="sm" className="mr-2" />
