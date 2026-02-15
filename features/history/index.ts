@@ -12,6 +12,7 @@ export { useSegments } from './hooks/useSegments'
 export { useEvents } from './hooks/useEvents'
 export { useEditorState } from './hooks/useEditorState'
 export { useVersionHistory } from './hooks/useVersionHistory'
+export { useDerivedContent } from './hooks/useDerivedContent'
 
 // Components
 export * from './components'

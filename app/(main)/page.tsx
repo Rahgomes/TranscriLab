@@ -18,8 +18,9 @@ import {
   useAudioUpload,
   useTranscription,
 } from '@/features/transcription'
-import { SummaryPanel, useSummary } from '@/features/summary'
+import { useSummary } from '@/features/summary'
 import { useHistoryStore } from '@/store'
+import { DeriveActionsCard, useDerivedContent } from '@/features/history'
 import { saveAudio } from '@/lib/audioStorage'
 
 const heroWords = [
@@ -65,6 +66,10 @@ export default function Home() {
     hasDiarization?: boolean
     speakerCount?: number
   } | null>(null)
+
+  const [copiedSummary, setCopiedSummary] = useState(false)
+
+  const derivedContent = useDerivedContent(currentTranscription?.historyId ?? '')
 
   // Atualiza o resumo no histórico quando for gerado
   useEffect(() => {
@@ -167,6 +172,25 @@ export default function Home() {
   function handleGenerateSummary() {
     if (currentTranscription) {
       generateSummary(currentTranscription.text)
+    }
+  }
+
+  async function handleCopySummary() {
+    if (!summary) return
+    try {
+      const textToCopy = `${summary.summary}\n\nInsights:\n${summary.insights.map(i => `• ${i}`).join('\n')}`
+      await navigator.clipboard.writeText(textToCopy)
+      setCopiedSummary(true)
+      toast.success('Resumo copiado!')
+      setTimeout(() => setCopiedSummary(false), 2000)
+    } catch {
+      toast.error('Erro ao copiar')
+    }
+  }
+
+  function handleEditTranscription() {
+    if (currentTranscription) {
+      router.push(`/history/${currentTranscription.historyId}?edit=true`)
     }
   }
 
@@ -290,14 +314,18 @@ export default function Home() {
                 segments={currentTranscription.segments}
                 hasDiarization={currentTranscription.hasDiarization}
                 onClear={handleClearTranscription}
+                onEdit={handleEditTranscription}
               />
 
-              <SummaryPanel
-                summary={summary}
-                isGenerating={isGenerating}
-                error={summaryError}
-                onGenerate={handleGenerateSummary}
-                disabled={isGenerating}
+              <DeriveActionsCard
+                generatingType={derivedContent.generatingType}
+                existingItems={derivedContent.items}
+                onGenerate={derivedContent.generateContent}
+                summary={summary ?? undefined}
+                isGeneratingSummary={isGenerating}
+                onGenerateSummary={handleGenerateSummary}
+                onCopySummary={handleCopySummary}
+                copiedSummary={copiedSummary}
               />
             </>
           )}

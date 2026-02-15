@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Copy, Check, Home } from 'lucide-react'
+import { Copy, Check, Home, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
@@ -16,9 +16,10 @@ interface TranscriptionCardProps {
   segments?: TranscriptionSegment[]
   hasDiarization?: boolean
   onClear: () => void
+  onEdit?: () => void
 }
 
-export function TranscriptionCard({ text, fileName, segments, hasDiarization, onClear }: TranscriptionCardProps) {
+export function TranscriptionCard({ text, fileName, segments, hasDiarization, onClear, onEdit }: TranscriptionCardProps) {
   const [copied, setCopied] = useState(false)
 
   const speakers = useMemo(
@@ -94,6 +95,17 @@ export function TranscriptionCard({ text, fileName, segments, hasDiarization, on
             </>
           )}
         </Button>
+
+        {onEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar transcrição
+          </Button>
+        )}
 
         <Button
           variant="outline"

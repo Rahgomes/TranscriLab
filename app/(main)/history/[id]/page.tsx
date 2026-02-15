@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Icon } from '@/components/ui/icon'
 import { Button } from '@/components/ui/button'
@@ -45,7 +45,9 @@ import { findActiveEventIndex } from '@/lib/audioEvents'
 export default function TranscriptionDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const shouldEditOnLoad = searchParams.get('edit') === 'true'
 
   const items = useHistoryStore((state) => state.items)
   const categories = useHistoryStore((state) => state.categories)
@@ -94,11 +96,23 @@ export default function TranscriptionDetailPage() {
   // Derived content
   const derivedContent = useDerivedContent(id)
 
+  const hasEnteredEditRef = useRef(false)
+
   useEffect(() => {
     if (item) {
       setEditedName(item.fileName)
     }
   }, [item])
+
+  // Auto-enter edit mode when ?edit=true
+  useEffect(() => {
+    if (shouldEditOnLoad && item && !hasEnteredEditRef.current) {
+      // Se tem diarização, espera os segments carregarem
+      if (item.hasDiarization && segments.length === 0) return
+      hasEnteredEditRef.current = true
+      editor.enterEditMode()
+    }
+  }, [shouldEditOnLoad, item, editor, segments])
 
   const handleTimeUpdate = useCallback(
     (currentTime: number) => {
