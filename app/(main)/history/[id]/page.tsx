@@ -36,6 +36,9 @@ import { EventsList } from '@/features/history/components/EventsList'
 import { useEvents } from '@/features/history/hooks/useEvents'
 import { useEditorState } from '@/features/history/hooks/useEditorState'
 import { useVersionHistory } from '@/features/history/hooks/useVersionHistory'
+import { useDerivedContent } from '@/features/history/hooks/useDerivedContent'
+import { DeriveActionsCard } from '@/features/history/components/DeriveActionsCard'
+import { DerivedContentList } from '@/features/history/components/DerivedContentList'
 import { findActiveSegmentIndex } from '@/lib/segments'
 import { findActiveEventIndex } from '@/lib/audioEvents'
 
@@ -87,6 +90,9 @@ export default function TranscriptionDetailPage() {
 
   // Version history
   const versionHistory = useVersionHistory(item?.id)
+
+  // Derived content
+  const derivedContent = useDerivedContent(id)
 
   useEffect(() => {
     if (item) {
@@ -262,6 +268,8 @@ export default function TranscriptionDetailPage() {
     try {
       const response = await fetch(`/api/transcriptions/${item.id}/summary`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcriptionText: item.transcription }),
       })
 
       const data = await response.json()
@@ -552,6 +560,21 @@ export default function TranscriptionDetailPage() {
                 <span className="text-xs uppercase tracking-widest">Fim da Transcricao</span>
                 <Separator className="flex-1" />
               </div>
+
+              {/* Generated content section */}
+              {(derivedContent.items.length > 0 || derivedContent.isLoading) && (
+                <section className="mt-12">
+                  <h2 className="text-lg font-semibold flex items-center gap-2 mb-6">
+                    <Icon name="auto_awesome" size="md" className="text-primary" />
+                    Conteudos gerados com IA
+                  </h2>
+                  <DerivedContentList
+                    items={derivedContent.items}
+                    isLoading={derivedContent.isLoading}
+                    onDelete={derivedContent.deleteContent}
+                  />
+                </section>
+              )}
             </div>
           </main>
 
@@ -592,92 +615,17 @@ export default function TranscriptionDetailPage() {
                   />
                 )}
 
-                {/* Summary section */}
-                {item.summary ? (
-                  <>
-                    {/* AI Summary */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Icon name="auto_awesome" size="md" className="text-primary" />
-                          Resumo da IA
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm leading-relaxed text-muted-foreground">
-                          {item.summary.summary}
-                        </p>
-                        <div className="flex items-center justify-between mt-4">
-                          <Badge variant="secondary" className="text-xs">
-                            {item.summary.tokensUsed} tokens
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy('summary')}
-                            className="h-8 rounded-lg"
-                          >
-                            <Icon
-                              name={copiedText === 'summary' ? 'check' : 'content_copy'}
-                              size="xs"
-                              className="mr-1"
-                            />
-                            {copiedText === 'summary' ? 'Copiado' : 'Copiar'}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Key Points */}
-                    {item.summary.insights.length > 0 && (
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Icon name="lightbulb" size="md" className="text-amber-500" />
-                            Pontos Chave
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-3">
-                            {item.summary.insights.map((insight, index) => (
-                              <li key={index} className="flex gap-3 text-sm">
-                                <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 text-xs font-medium">
-                                  {index + 1}
-                                </span>
-                                <span className="text-muted-foreground">{insight}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </>
-                ) : (
-                  /* Generate summary CTA */
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center space-y-4">
-                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-                          <Icon name="auto_awesome" size="lg" className="text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">Gerar resumo com IA</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Extraia os pontos principais automaticamente
-                          </p>
-                        </div>
-                        <Button
-                          onClick={handleGenerateSummary}
-                          disabled={isGeneratingSummary}
-                          className="w-full rounded-xl"
-                        >
-                          <Icon name="auto_awesome" size="sm" className="mr-2" />
-                          {isGeneratingSummary ? 'Gerando...' : 'Gerar Resumo'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                {/* IA para acao - unified card (summary + derived content) */}
+                <DeriveActionsCard
+                  generatingType={derivedContent.generatingType}
+                  existingItems={derivedContent.items}
+                  onGenerate={derivedContent.generateContent}
+                  summary={item.summary}
+                  isGeneratingSummary={isGeneratingSummary}
+                  onGenerateSummary={handleGenerateSummary}
+                  onCopySummary={() => handleCopy('summary')}
+                  copiedSummary={copiedText === 'summary'}
+                />
 
                 {/* File info */}
                 <Card>

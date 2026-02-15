@@ -1,28 +1,38 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { openai } from '@/lib/openai'
-import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
-import { mapSummaryToSummaryData } from '@/lib/mappers'
+import { jsonResponse, errorResponse } from '@/lib/api'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    if (!prisma) return dbUnavailableResponse()
-
     const { id } = await params
+    const body = await request.json().catch(() => ({}))
+    const { transcriptionText } = body as { transcriptionText?: string }
 
-    // Buscar transcricao
-    const transcription = await prisma.transcription.findUnique({
-      where: { id },
-      select: { id: true, transcription: true },
-    })
+    let text: string
 
-    if (!transcription) {
-      return notFoundResponse('Transcricao')
+    if (transcriptionText) {
+      // Client sent transcription data directly (localStorage-first mode)
+      text = transcriptionText
+    } else if (prisma) {
+      // Fetch from DB (original behavior)
+      const transcription = await prisma.transcription.findUnique({
+        where: { id },
+        select: { transcription: true },
+      })
+
+      if (!transcription) {
+        return errorResponse('Transcrição não encontrada', 404)
+      }
+
+      text = transcription.transcription
+    } else {
+      return errorResponse('Dados da transcrição não fornecidos e banco de dados indisponível', 400)
     }
 
-    if (transcription.transcription.length < 50) {
+    if (text.length < 50) {
       return errorResponse('Texto muito curto para gerar resumo')
     }
 
@@ -41,7 +51,7 @@ Responda APENAS com JSON valido, sem markdown ou formatacao adicional.`,
         },
         {
           role: 'user',
-          content: transcription.transcription,
+          content: text,
         },
       ],
       temperature: 0.3,
@@ -56,26 +66,38 @@ Responda APENAS com JSON valido, sem markdown ou formatacao adicional.`,
 
     const result = JSON.parse(content)
     const tokensUsed = completion.usage?.total_tokens || 0
+    const generatedAt = new Date().toISOString()
 
-    // Upsert do summary
-    const summary = await prisma.summary.upsert({
-      where: { transcriptionId: id },
-      update: {
-        summary: result.summary || '',
-        insights: result.insights || [],
-        tokensUsed,
-        generatedAt: new Date(),
-      },
-      create: {
-        transcriptionId: id,
-        summary: result.summary || '',
-        insights: result.insights || [],
-        tokensUsed,
-        generatedAt: new Date(),
-      },
+    // Try to save to DB (optional — if it fails, still return the content)
+    if (prisma) {
+      try {
+        await prisma.summary.upsert({
+          where: { transcriptionId: id },
+          update: {
+            summary: result.summary || '',
+            insights: result.insights || [],
+            tokensUsed,
+            generatedAt: new Date(),
+          },
+          create: {
+            transcriptionId: id,
+            summary: result.summary || '',
+            insights: result.insights || [],
+            tokensUsed,
+            generatedAt: new Date(),
+          },
+        })
+      } catch (dbError) {
+        console.warn('[TranscriLab] Falha ao salvar resumo no banco:', dbError)
+      }
+    }
+
+    return jsonResponse({
+      summary: result.summary || '',
+      insights: result.insights || [],
+      tokensUsed,
+      generatedAt,
     })
-
-    return jsonResponse(mapSummaryToSummaryData(summary))
   } catch (error) {
     console.error('Erro ao gerar resumo:', error)
 

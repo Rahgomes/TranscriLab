@@ -5,12 +5,14 @@ import type {
   TranscriptionSegment as PrismaSegment,
   AudioEvent as PrismaAudioEvent,
   TranscriptionVersion as PrismaVersion,
+  DerivedContent as PrismaDerivedContent,
 } from '@prisma/client'
 import type { HistoryItem, HistoryCategory } from '@/features/history/types'
 import type { SummaryData } from '@/features/summary/types'
 import type { TranscriptionSegment } from '@/features/transcription/types'
 import type { AudioEvent } from '@/features/history/types/events'
 import type { VersionSummary, VersionDetail } from '@/features/history/types/versions'
+import type { DerivedContentData } from '@/features/history/types/derivedContent'
 
 type TranscriptionWithRelations = Transcription & {
   category: Category | null
@@ -103,5 +105,19 @@ export function mapVersionToDetail(v: PrismaVersion): VersionDetail {
     changesSummary: v.changesSummary,
     editorId: v.editorId ?? undefined,
     snapshot: v.snapshot as unknown as VersionDetail['snapshot'],
+  }
+}
+
+export function mapDerivedContent(d: PrismaDerivedContent): DerivedContentData {
+  return {
+    id: d.id,
+    transcriptionId: d.transcriptionId,
+    type: d.type,
+    title: d.title,
+    content: d.content,
+    tokensUsed: d.tokensUsed,
+    modelUsed: d.modelUsed,
+    metadata: d.metadata as Record<string, unknown> | null,
+    createdAt: d.createdAt.toISOString(),
   }
 }

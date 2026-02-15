@@ -8,8 +8,11 @@ import type { SummaryData } from '@/features/summary/types'
 import type { TranscriptionSegment } from '@/features/transcription/types'
 import type { AudioEvent } from '@/features/history/types/events'
 import type { VersionSummary, VersionDetail, VersionSnapshot } from '@/features/history/types/versions'
+import type { DerivedContentData } from '@/features/history/types/derivedContent'
 import { DEFAULT_CATEGORIES, MAX_LOCAL_VERSIONS } from '@/features/history/constants'
 import { deleteAudio, clearAllAudios } from '@/lib/audioStorage'
+
+const EMPTY_DERIVED_CONTENTS: DerivedContentData[] = []
 
 function createSnapshotFromItem(item: HistoryItem): VersionSnapshot {
   return {
@@ -38,6 +41,7 @@ interface HistoryState {
   // State
   items: HistoryItem[]
   categories: HistoryCategory[]
+  derivedContents: Record<string, DerivedContentData[]>
   isLoading: boolean
   isInitialized: boolean
   dbAvailable: boolean
@@ -73,6 +77,11 @@ interface HistoryState {
   getLocalVersionSnapshot: (id: string, versionNumber: number) => VersionDetail | null
   restoreLocalVersion: (id: string, versionNumber: number) => { currentVersion: number; transcription: string; segments?: TranscriptionSegment[] } | null
 
+  // Derived content actions (localStorage always, API when available)
+  addDerivedContent: (transcriptionId: string, item: DerivedContentData) => void
+  removeDerivedContent: (transcriptionId: string, derivedId: string) => void
+  setDerivedContents: (transcriptionId: string, items: DerivedContentData[]) => void
+
   // Category actions (async - localStorage always, API when available)
   addCategory: (name: string, color: string) => Promise<HistoryCategory>
   updateCategory: (id: string, name: string, color: string) => Promise<void>
@@ -97,6 +106,7 @@ export const useHistoryStore = create<HistoryState>()(
         // Initial state
         items: [],
         categories: [],
+        derivedContents: {},
         isLoading: false,
         isInitialized: false,
         dbAvailable: false,
@@ -275,6 +285,7 @@ export const useHistoryStore = create<HistoryState>()(
           // Always remove from store (persist saves)
           set((state) => {
             state.items = state.items.filter((item) => item.id !== id)
+            delete state.derivedContents[id]
           })
 
           // Delete audio from IndexedDB
@@ -465,6 +476,7 @@ export const useHistoryStore = create<HistoryState>()(
           // Always clear store (persist saves)
           set((state) => {
             state.items = []
+            state.derivedContents = {}
           })
 
           // Clear IndexedDB
@@ -482,6 +494,32 @@ export const useHistoryStore = create<HistoryState>()(
               console.warn('[TranscriLab] Falha ao sincronizar clear com API:', err)
             }
           }
+        },
+
+        // Derived content actions — localStorage always (via persist)
+        addDerivedContent: (transcriptionId, item) => {
+          set((state) => {
+            if (!state.derivedContents[transcriptionId]) {
+              state.derivedContents[transcriptionId] = []
+            }
+            state.derivedContents[transcriptionId].unshift(item)
+          })
+        },
+
+        removeDerivedContent: (transcriptionId, derivedId) => {
+          set((state) => {
+            if (state.derivedContents[transcriptionId]) {
+              state.derivedContents[transcriptionId] = state.derivedContents[transcriptionId].filter(
+                (item) => item.id !== derivedId
+              )
+            }
+          })
+        },
+
+        setDerivedContents: (transcriptionId, items) => {
+          set((state) => {
+            state.derivedContents[transcriptionId] = items
+          })
         },
 
         // Category actions — localStorage always (via persist), API when available
@@ -643,6 +681,7 @@ export const useHistoryStore = create<HistoryState>()(
         partialize: (state) => ({
           items: state.items,
           categories: state.categories,
+          derivedContents: state.derivedContents,
         }),
       }
     ),
@@ -663,3 +702,5 @@ export const useHistoryFilters = () =>
   }))
 export const useHistoryInitialized = () => useHistoryStore((state) => state.isInitialized)
 export const useDbAvailable = () => useHistoryStore((state) => state.dbAvailable)
+export const useDerivedContentsForItem = (id: string) =>
+  useHistoryStore((state) => state.derivedContents[id] ?? EMPTY_DERIVED_CONTENTS)

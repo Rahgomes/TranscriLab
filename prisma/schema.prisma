@@ -24,6 +24,16 @@ enum AudioEventType {
   OTHER
 }
 
+enum DerivedContentType {
+  MEETING_MINUTES
+  TASK_LIST
+  CLIENT_EMAIL
+  WHATSAPP_MESSAGE
+  LINKEDIN_POST
+  VIDEO_SCRIPT
+  FAQ
+}
+
 // === Models ===
 
 model Category {
@@ -64,8 +74,9 @@ model Transcription {
   audioFile AudioFile?
   segments  TranscriptionSegment[]
   events    AudioEvent[]
-  versions  TranscriptionVersion[]
-  hasEvents Boolean             @default(false)
+  versions        TranscriptionVersion[]
+  derivedContents DerivedContent[]
+  hasEvents       Boolean             @default(false)
 
   @@index([categoryId])
   @@index([createdAt(sort: Desc)])
@@ -141,6 +152,24 @@ model TranscriptionVersion {
   @@index([transcriptionId])
   @@index([transcriptionId, editedAt])
   @@map("transcription_versions")
+}
+
+model DerivedContent {
+  id        String             @id @default(uuid())
+  type      DerivedContentType
+  title     String             @db.VarChar(300)
+  content   String             @db.Text
+  tokensUsed Int               @default(0)
+  modelUsed  String            @db.VarChar(50)
+  metadata   Json?             @db.JsonB
+  createdAt  DateTime          @default(now())
+
+  transcriptionId String
+  transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptionId])
+  @@index([transcriptionId, type])
+  @@map("derived_contents")
 }
 
 model AudioFile {
