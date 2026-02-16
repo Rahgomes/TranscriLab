@@ -77,6 +77,7 @@ model Transcription {
   versions        TranscriptionVersion[]
   derivedContents DerivedContent[]
   hasEvents       Boolean             @default(false)
+  source          String?             @default("upload") @db.VarChar(20)
 
   @@index([categoryId])
   @@index([createdAt(sort: Desc)])

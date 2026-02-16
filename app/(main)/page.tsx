@@ -18,10 +18,11 @@ import {
   useAudioUpload,
   useTranscription,
 } from '@/features/transcription'
+import { RecordButton } from '@/features/realtime'
 import { useSummary } from '@/features/summary'
 import { useHistoryStore } from '@/store'
 import { DeriveActionsCard, useDerivedContent } from '@/features/history'
-import { saveAudio } from '@/lib/audioStorage'
+import { saveAudio, deleteAudio } from '@/lib/audioStorage'
 
 const heroWords = [
   'com inteligencia artificial',
@@ -47,6 +48,8 @@ export default function Home() {
   const { transcribe } = useTranscription()
   const { summary, isGenerating, error: summaryError, generateSummary, clearSummary } = useSummary()
   const addItem = useHistoryStore((state) => state.addItem)
+  const updateItem = useHistoryStore((state) => state.updateItem)
+  const deleteItem = useHistoryStore((state) => state.deleteItem)
   const updateItemSummary = useHistoryStore((state) => state.updateItemSummary)
   const items = useHistoryStore((state) => state.items)
   const count = items.length
@@ -188,10 +191,22 @@ export default function Home() {
     }
   }
 
-  function handleEditTranscription() {
-    if (currentTranscription) {
-      router.push(`/history/${currentTranscription.historyId}?edit=true`)
+  async function handleTextChange(newText: string) {
+    if (!currentTranscription) return
+    setCurrentTranscription((prev) => (prev ? { ...prev, text: newText } : null))
+    await updateItem(currentTranscription.historyId, { transcription: newText })
+    toast.success('Transcrição atualizada!')
+  }
+
+  async function handleRestart() {
+    if (!currentTranscription) return
+    try {
+      await deleteItem(currentTranscription.historyId)
+      await deleteAudio(currentTranscription.historyId)
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error)
     }
+    handleClearTranscription()
   }
 
   function handleSelectHistoryItem(id: string) {
@@ -223,6 +238,10 @@ export default function Home() {
 
         {/* Main Content */}
         <main className="space-y-8">
+          {showUploader && (
+            <RecordButton variant="home" className="mb-4" />
+          )}
+
           {showUploader && (
             <AudioUploader
               onFilesSelected={handleFilesSelected}
@@ -314,7 +333,8 @@ export default function Home() {
                 segments={currentTranscription.segments}
                 hasDiarization={currentTranscription.hasDiarization}
                 onClear={handleClearTranscription}
-                onEdit={handleEditTranscription}
+                onTextChange={handleTextChange}
+                onRestart={handleRestart}
               />
 
               <DeriveActionsCard

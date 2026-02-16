@@ -42,6 +42,7 @@ export function mapTranscriptionToHistoryItem(
     hasEvents: t.hasEvents,
     originalTranscription: t.originalTranscriptionText ?? undefined,
     currentVersion: t.currentVersion,
+    source: (t.source as 'upload' | 'realtime') ?? 'upload',
   }
 }
 

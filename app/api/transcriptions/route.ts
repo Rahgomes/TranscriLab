@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       segments,
       events,
       hasEvents,
+      source,
     } = body
 
     if (!fileName || !originalFileName || !fileSize || !text) {
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
         hasDiarization: hasDiarization ?? false,
         speakerCount: speakerCount ?? null,
         hasEvents: hasEvents ?? false,
+        source: source ?? 'upload',
         segments: Array.isArray(segments) && segments.length > 0
           ? {
               createMany: {

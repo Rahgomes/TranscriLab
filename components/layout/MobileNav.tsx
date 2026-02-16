@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/sheet'
 import { useHistoryCount } from '@/store'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { RecordButton } from '@/features/realtime'
 
 const navItems = [
   {
@@ -89,6 +90,12 @@ export function MobileNav() {
                 </Link>
               )
             })}
+
+            <div className="mt-2 pt-2 border-t border-border/50">
+              <div onClick={() => setOpen(false)}>
+                <RecordButton variant="mobile-nav" />
+              </div>
+            </div>
           </nav>
         </SheetContent>
       </Sheet>

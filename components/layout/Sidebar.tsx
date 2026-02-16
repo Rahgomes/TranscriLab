@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { RecordButton } from "@/features/realtime";
 
 const navItems = [
   {
@@ -128,6 +129,11 @@ export function Sidebar() {
               </Tooltip>
             );
           })}
+
+          {/* Record button */}
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <RecordButton variant={sidebarOpen ? "sidebar" : "sidebar-collapsed"} />
+          </div>
         </nav>
 
         {/* Footer */}

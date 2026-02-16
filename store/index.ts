@@ -24,3 +24,12 @@ export {
   useSidebarOpen,
   useMobileMenuOpen,
 } from './useUIStore'
+
+// Recording Store
+export {
+  useRecordingStore,
+  useRecordingModalOpen,
+  useRecordingPhase,
+  useRecordingSegments,
+  useRecordingDuration,
+} from './useRecordingStore'

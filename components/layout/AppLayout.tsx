@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { GridBackground } from '@/components/ui/grid-background'
+import { RecordingOverlay } from '@/features/realtime'
 
 interface AppLayoutProps {
   children: ReactNode
@@ -23,6 +24,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </GridBackground>
       </main>
+      <RecordingOverlay />
     </div>
   )
 }

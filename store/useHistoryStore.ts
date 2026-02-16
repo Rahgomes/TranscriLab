@@ -219,6 +219,7 @@ export const useHistoryStore = create<HistoryState>()(
                   segments: segments ?? [],
                   events: events ?? [],
                   hasEvents: events && events.length > 0 ? true : false,
+                  source: itemData.source ?? 'upload',
                 }),
               })
 

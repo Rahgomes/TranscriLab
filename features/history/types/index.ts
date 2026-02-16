@@ -24,6 +24,7 @@ export interface HistoryItem {
   originalTranscription?: string
   currentVersion?: number
   localVersions?: LocalVersion[]
+  source?: 'upload' | 'realtime'
 }
 
 export interface HistoryCategory {
