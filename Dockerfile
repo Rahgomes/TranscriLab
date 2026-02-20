@@ -6,12 +6,13 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Install dependencies - ignore postinstall to control prisma generate
+# Install dependencies
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-# Ignore scripts to avoid postinstall running prisma generate without DATABASE_URL
-RUN npm ci --ignore-scripts
+# Set DATABASE_URL for prisma generate during npm postinstall
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -19,7 +20,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma Client with dummy URL (only needed at build time)
+# Generate Prisma Client (redundant but safe)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 
