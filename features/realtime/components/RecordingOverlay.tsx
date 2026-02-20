@@ -27,6 +27,28 @@ function formatTimer(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
+// Post-process transcription with GPT for error correction
+async function postprocessTranscription(text: string): Promise<string> {
+  try {
+    const response = await fetch('/api/realtime/postprocess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    
+    if (!response.ok) {
+      console.warn('Postprocess failed, using original text')
+      return text
+    }
+    
+    const data = await response.json()
+    return data.text || text
+  } catch (error) {
+    console.warn('Postprocess error, using original text:', error)
+    return text
+  }
+}
+
 export function RecordingOverlay() {
   const router = useRouter()
   const isOpen = useRecordingStore((s) => s.isRecordingModalOpen)
@@ -64,10 +86,19 @@ export function RecordingOverlay() {
       setIsSaving(true)
       try {
         const now = new Date()
-        const fileName = `Gravacao ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-        const fullText = editedText || recordingResult?.fullText || session.fullText
+        const fileName = `Gravação ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+        const rawText = editedText || recordingResult?.fullText || session.fullText
         const segments = recordingResult?.segments || session.segments
         const duration = recordingResult?.duration || session.duration
+
+        // Post-process transcription with GPT for error correction
+        // Only if text wasn't manually edited
+        let finalText = rawText
+        if (!editedText && rawText.trim().length >= 10) {
+          toast.loading('Refinando transcrição...', { id: 'postprocess' })
+          finalText = await postprocessTranscription(rawText)
+          toast.dismiss('postprocess')
+        }
 
         // Convert RealtimeSegments to TranscriptionSegments
         const transcriptionSegments: TranscriptionSegment[] = segments
@@ -86,7 +117,8 @@ export function RecordingOverlay() {
             originalFileName: `${fileName}.webm`,
             fileSize: recordingResult?.audioBlob.size ?? 0,
             duration,
-            transcription: fullText,
+            transcription: finalText,
+            originalTranscriptionText: rawText !== finalText ? rawText : undefined,
             hasAudio: !!recordingResult?.audioBlob,
             audioMimeType: recordingResult?.mimeType ?? 'audio/webm',
             hasDiarization: false,
@@ -108,11 +140,11 @@ export function RecordingOverlay() {
             )
             await saveAudio(historyItem.id, audioFile)
           } catch (error) {
-            console.error('Erro ao salvar audio:', error)
+            console.error('Erro ao salvar áudio:', error)
           }
         }
 
-        toast.success('Gravacao salva no historico!')
+        toast.success('Gravação salva no histórico!')
 
         // Cleanup and close
         session.discardSession()
@@ -122,8 +154,8 @@ export function RecordingOverlay() {
         // Navigate to detail page
         router.push(`/history/${historyItem.id}`)
       } catch (error) {
-        console.error('Erro ao salvar gravacao:', error)
-        toast.error('Erro ao salvar a gravacao')
+        console.error('Erro ao salvar gravação:', error)
+        toast.error('Erro ao salvar a gravação')
       } finally {
         setIsSaving(false)
       }
@@ -144,13 +176,13 @@ export function RecordingOverlay() {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogTitle className="sr-only">Gravacao em tempo real</DialogTitle>
+        <DialogTitle className="sr-only">Gravação em tempo real</DialogTitle>
 
         {/* Header with timer */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-3">
             <Icon name="mic" size="lg" className="text-primary" />
-            <span className="font-semibold text-lg">Gravacao em Tempo Real</span>
+            <span className="font-semibold text-lg">Gravação em Tempo Real</span>
           </div>
           {(phase === 'recording' || phase === 'paused') && (
             <div className="flex items-center gap-2">
@@ -198,10 +230,10 @@ export function RecordingOverlay() {
                 </motion.div>
                 <div className="text-center space-y-2">
                   <p className="text-lg font-medium">
-                    Permita acesso ao microfone para iniciar a gravacao
+                    Permita acesso ao microfone para iniciar a gravação
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    O audio sera transcrito em tempo real enquanto voce fala.
+                    O áudio será transcrito em tempo real enquanto você fala.
                   </p>
                 </div>
                 <Button
@@ -213,12 +245,12 @@ export function RecordingOverlay() {
                   {phase === 'requesting-permission' ? (
                     <>
                       <Icon name="hourglass_empty" size="md" className="animate-spin" />
-                      Aguardando permissao...
+                      Aguardando permissão...
                     </>
                   ) : (
                     <>
                       <Icon name="mic" size="md" />
-                      Iniciar Gravacao
+                      Iniciar Gravação
                     </>
                   )}
                 </Button>
@@ -242,7 +274,7 @@ export function RecordingOverlay() {
                   />
                 </div>
                 <p className="text-muted-foreground">
-                  Conectando ao servico de transcricao...
+                  Conectando ao serviço de transcrição...
                 </p>
               </motion.div>
             )}
@@ -291,7 +323,7 @@ export function RecordingOverlay() {
                   className="text-primary animate-spin"
                 />
                 <p className="text-muted-foreground">
-                  Finalizando transcricao...
+                  Finalizando transcrição...
                 </p>
               </motion.div>
             )}
@@ -333,7 +365,7 @@ export function RecordingOverlay() {
                   />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="font-medium">Erro na gravacao</p>
+                  <p className="font-medium">Erro na gravação</p>
                   <p className="text-sm text-muted-foreground max-w-md">
                     {error}
                   </p>
