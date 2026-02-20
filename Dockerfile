@@ -48,3 +48,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
+# Rebuild trigger: Fri Feb 20 02:32:46 UTC 2026
