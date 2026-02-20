@@ -34,14 +34,19 @@ export function useMediaCapture(): UseMediaCaptureReturn {
   const streamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const fullRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunkRecorderRef = useRef<MediaRecorder | null>(null)
   const fullChunksRef = useRef<Blob[]>([])
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const chunkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
   const pausedDurationRef = useRef<number>(0)
   const pauseStartRef = useRef<number>(0)
   const onAudioChunkRef = useRef<((blob: Blob) => void) | null>(null)
   const isPausedRef = useRef(false)
+  const mimeTypeRef = useRef<string>(RECORDING_MIME_TYPE)
+  
+  // For chunk recording - we'll create new recorders for each chunk
+  const chunkRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunkDataRef = useRef<Blob[]>([])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -55,6 +60,10 @@ export function useMediaCapture(): UseMediaCaptureReturn {
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current)
       durationIntervalRef.current = null
+    }
+    if (chunkIntervalRef.current) {
+      clearInterval(chunkIntervalRef.current)
+      chunkIntervalRef.current = null
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close()
@@ -77,6 +86,7 @@ export function useMediaCapture(): UseMediaCaptureReturn {
     setIsPaused(false)
     setDuration(0)
     fullChunksRef.current = []
+    chunkDataRef.current = []
     onAudioChunkRef.current = null
   }
 
@@ -100,10 +110,50 @@ export function useMediaCapture(): UseMediaCaptureReturn {
     }
   }, [])
 
+  // Create a new chunk recorder and start it
+  const startChunkRecorder = useCallback(() => {
+    if (!streamRef.current || isPausedRef.current) return
+    
+    const mimeType = mimeTypeRef.current
+    chunkDataRef.current = []
+    
+    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    chunkRecorderRef.current = recorder
+    
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunkDataRef.current.push(event.data)
+      }
+    }
+    
+    recorder.onstop = () => {
+      // When stopped, create a complete blob and send it
+      if (chunkDataRef.current.length > 0 && onAudioChunkRef.current && !isPausedRef.current) {
+        const completeBlob = new Blob(chunkDataRef.current, { type: mimeType })
+        if (completeBlob.size > 0) {
+          onAudioChunkRef.current(completeBlob)
+        }
+      }
+      chunkDataRef.current = []
+    }
+    
+    recorder.start()
+  }, [])
+
+  // Stop current chunk recorder (triggers onstop which sends the chunk)
+  const stopAndRestartChunkRecorder = useCallback(() => {
+    if (chunkRecorderRef.current && chunkRecorderRef.current.state === 'recording') {
+      chunkRecorderRef.current.stop()
+    }
+    // Start a new recorder for the next chunk
+    startChunkRecorder()
+  }, [startChunkRecorder])
+
   const startCapture = useCallback(
     async (onAudioChunk: (blob: Blob) => void) => {
       onAudioChunkRef.current = onAudioChunk
       fullChunksRef.current = []
+      chunkDataRef.current = []
 
       // Get microphone stream
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -130,6 +180,7 @@ export function useMediaCapture(): UseMediaCaptureReturn {
       setAnalyserNode(analyser)
 
       const mimeType = getSupportedMimeType(RECORDING_MIME_TYPE, RECORDING_MIME_TYPE_FALLBACK)
+      mimeTypeRef.current = mimeType
 
       // Full recorder — collects data for the final save blob
       const fullRecorder = new MediaRecorder(stream, { mimeType })
@@ -141,15 +192,16 @@ export function useMediaCapture(): UseMediaCaptureReturn {
       }
       fullRecorder.start(1000) // collect every second
 
-      // Chunk recorder — delivers blobs for transcription at CHUNK_INTERVAL_MS
-      const chunkRecorder = new MediaRecorder(stream, { mimeType })
-      chunkRecorderRef.current = chunkRecorder
-      chunkRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && onAudioChunkRef.current && !isPausedRef.current) {
-          onAudioChunkRef.current(event.data)
+      // Start first chunk recorder
+      startChunkRecorder()
+      
+      // Set up interval to stop/restart chunk recorder every CHUNK_INTERVAL_MS
+      // This ensures each chunk is a complete, valid audio file
+      chunkIntervalRef.current = setInterval(() => {
+        if (!isPausedRef.current) {
+          stopAndRestartChunkRecorder()
         }
-      }
-      chunkRecorder.start(CHUNK_INTERVAL_MS)
+      }, CHUNK_INTERVAL_MS)
 
       // Duration timer
       startTimeRef.current = Date.now()
@@ -164,8 +216,7 @@ export function useMediaCapture(): UseMediaCaptureReturn {
       setIsCapturing(true)
       setIsPaused(false)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [startChunkRecorder, stopAndRestartChunkRecorder],
   )
 
   const pauseCapture = useCallback(() => {
@@ -175,8 +226,10 @@ export function useMediaCapture(): UseMediaCaptureReturn {
     if (fullRecorderRef.current?.state === 'recording') {
       fullRecorderRef.current.pause()
     }
+    // Stop chunk recorder while paused (don't send incomplete chunk)
     if (chunkRecorderRef.current?.state === 'recording') {
-      chunkRecorderRef.current.pause()
+      chunkRecorderRef.current.stop()
+      chunkRecorderRef.current = null
     }
   }, [])
 
@@ -190,16 +243,21 @@ export function useMediaCapture(): UseMediaCaptureReturn {
     if (fullRecorderRef.current?.state === 'paused') {
       fullRecorderRef.current.resume()
     }
-    if (chunkRecorderRef.current?.state === 'paused') {
-      chunkRecorderRef.current.resume()
-    }
-  }, [])
+    // Start a new chunk recorder
+    startChunkRecorder()
+  }, [startChunkRecorder])
 
   const stopCapture = useCallback((): { audioBlob: Blob; mimeType: string } | null => {
     // Stop duration timer
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current)
       durationIntervalRef.current = null
+    }
+    
+    // Stop chunk interval
+    if (chunkIntervalRef.current) {
+      clearInterval(chunkIntervalRef.current)
+      chunkIntervalRef.current = null
     }
 
     // Close audio context
@@ -208,7 +266,7 @@ export function useMediaCapture(): UseMediaCaptureReturn {
       audioContextRef.current = null
     }
 
-    // Stop chunk recorder
+    // Stop chunk recorder (will trigger final chunk send via onstop)
     if (chunkRecorderRef.current && chunkRecorderRef.current.state !== 'inactive') {
       chunkRecorderRef.current.stop()
     }
@@ -216,12 +274,12 @@ export function useMediaCapture(): UseMediaCaptureReturn {
 
     // Stop full recorder and get blob
     let audioBlob: Blob | null = null
-    let mimeType = RECORDING_MIME_TYPE
+    let mimeType = mimeTypeRef.current
     if (fullRecorderRef.current) {
       if (fullRecorderRef.current.state !== 'inactive') {
         fullRecorderRef.current.stop()
       }
-      mimeType = fullRecorderRef.current.mimeType || RECORDING_MIME_TYPE
+      mimeType = fullRecorderRef.current.mimeType || mimeTypeRef.current
       audioBlob = new Blob(fullChunksRef.current, { type: mimeType })
       fullRecorderRef.current = null
     }
