@@ -18,11 +18,12 @@ export async function POST(request: NextRequest) {
     const transcription = await groq.audio.transcriptions.create({
       model: 'whisper-large-v3-turbo',
       file: await toFile(buffer, 'chunk.webm'),
-      language: 'pt',
+      // Removed 'language' parameter to allow multi-language detection
+      // Whisper will auto-detect the language of each segment
       response_format: 'verbose_json',
       temperature: 0,
       prompt:
-        'Transcreva o audio em portugues brasileiro com pontuacao adequada.',
+        'Transcreva o áudio fielmente, mantendo termos em qualquer idioma exatamente como falados (português, inglês, espanhol, etc). Use pontuação adequada.',
     })
 
     return jsonResponse({
