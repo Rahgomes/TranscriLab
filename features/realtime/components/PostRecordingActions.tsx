@@ -97,62 +97,67 @@ export function PostRecordingActions({
         </span>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+      {/* Action buttons - reorganized in groups */}
+      <div className="flex flex-col gap-3">
+        {/* Primary action - full width on mobile */}
         <Button
           size="lg"
           onClick={() => onSave(isEditing ? editText : undefined)}
           disabled={isSaving || !displayText.trim()}
-          className="rounded-xl gap-2 w-full sm:w-auto"
+          className="rounded-xl gap-2 w-full"
         >
           <Icon name="save" size="md" />
-          {isSaving ? 'Salvando...' : 'Salvar no Historico'}
+          {isSaving ? 'Salvando...' : 'Salvar no Histórico'}
         </Button>
 
-        {isEditing ? (
+        {/* Secondary actions - grid layout */}
+        <div className="grid grid-cols-2 gap-2">
+          {isEditing ? (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleCancelEdit}
+              disabled={isSaving}
+              className="rounded-xl gap-2"
+            >
+              <Icon name="close" size="sm" />
+              Cancelar
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => setIsEditing(true)}
+              disabled={isSaving || !fullText.trim()}
+              className="rounded-xl gap-2"
+            >
+              <Icon name="edit" size="sm" />
+              Editar
+            </Button>
+          )}
+
           <Button
             variant="outline"
-            size="lg"
-            onClick={handleCancelEdit}
+            size="default"
+            onClick={() => setShowRestartDialog(true)}
             disabled={isSaving}
-            className="rounded-xl gap-2 w-full sm:w-auto"
+            className="rounded-xl gap-2"
           >
-            <Icon name="close" size="md" />
-            Cancelar edição
+            <RotateCcw className="w-4 h-4" />
+            Regravar
           </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() => setIsEditing(true)}
-            disabled={isSaving || !fullText.trim()}
-            className="rounded-xl gap-2 w-full sm:w-auto"
-          >
-            <Icon name="edit" size="md" />
-            Editar antes de salvar
-          </Button>
-        )}
+        </div>
 
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={() => setShowRestartDialog(true)}
-          disabled={isSaving}
-          className="rounded-xl gap-2 w-full sm:w-auto"
-        >
-          <RotateCcw className="w-5 h-5" />
-          Regravar
-        </Button>
-
+        {/* Destructive action - separate row */}
         <Button
           variant="ghost"
-          size="lg"
+          size="sm"
           onClick={() => setShowDiscardDialog(true)}
           disabled={isSaving}
-          className="rounded-xl gap-2 text-destructive hover:text-destructive w-full sm:w-auto"
+          className="rounded-xl gap-2 text-muted-foreground hover:text-destructive"
         >
-          <Icon name="delete" size="md" />
-          Descartar
+          <Icon name="delete" size="sm" />
+          Descartar gravação
         </Button>
       </div>
 
@@ -160,9 +165,9 @@ export function PostRecordingActions({
       <Dialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Descartar gravacao?</DialogTitle>
+            <DialogTitle>Descartar gravação?</DialogTitle>
             <DialogDescription>
-              A gravacao e a transcricao serao perdidas permanentemente. Esta acao nao pode ser desfeita.
+              A gravação e a transcrição serão perdidas permanentemente. Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
