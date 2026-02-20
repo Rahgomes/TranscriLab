@@ -118,7 +118,7 @@ export function RecordingOverlay() {
             fileSize: recordingResult?.audioBlob.size ?? 0,
             duration,
             transcription: finalText,
-            originalTranscriptionText: rawText !== finalText ? rawText : undefined,
+            originalTranscription: rawText !== finalText ? rawText : undefined,
             hasAudio: !!recordingResult?.audioBlob,
             audioMimeType: recordingResult?.mimeType ?? 'audio/webm',
             hasDiarization: false,
