@@ -37,6 +37,52 @@ enum DerivedContentType {
 
 // === Models ===
 
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @db.VarChar(255)
+  name          String    @db.VarChar(100)
+  avatarUrl     String?   @db.VarChar(500)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  resetTokens   PasswordResetToken[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 model Category {
   id        String   @id @default(uuid())
   name      String   @db.VarChar(100)

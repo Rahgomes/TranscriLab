@@ -19,7 +19,7 @@ export function TopBar() {
   const getInitials = useUserStore((s) => s.getInitials)
 
   return (
-    <header className="fixed top-0 right-0 left-0 md:left-16 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
+    <header className="hidden md:block fixed top-0 right-0 left-16 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between px-4 md:px-6">
         {/* Left side - can add breadcrumbs or page title later */}
         <div className="flex items-center gap-2">
