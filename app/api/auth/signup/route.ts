@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 import { hashPassword, createSession } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await getPrisma().user.findUnique({
       where: { email: email.toLowerCase() },
     })
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Create user
     const passwordHash = await hashPassword(password)
-    const user = await prisma.user.create({
+    const user = await getPrisma().user.create({
       data: {
         name,
         email: email.toLowerCase(),

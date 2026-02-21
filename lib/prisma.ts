@@ -25,3 +25,12 @@ function getPrismaClient(): PrismaClient | null {
 }
 
 export const prisma = getPrismaClient()
+
+// Use this in server-side code where prisma must exist
+export function getPrisma(): PrismaClient {
+  const client = getPrismaClient()
+  if (!client) {
+    throw new Error('DATABASE_URL is not configured')
+  }
+  return client
+}

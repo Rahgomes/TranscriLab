@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 import { verifyPassword, createSession } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await getPrisma().user.findUnique({
       where: { email: email.toLowerCase() },
     })
 

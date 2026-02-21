@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 import { verifyPasswordResetToken, consumePasswordResetToken, hashPassword } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Update password
     const passwordHash = await hashPassword(password)
-    await prisma.user.update({
+    await getPrisma().user.update({
       where: { id: userId },
       data: { passwordHash },
     })
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     await consumePasswordResetToken(token)
 
     // Invalidate all sessions for this user
-    await prisma.session.deleteMany({
+    await getPrisma().session.deleteMany({
       where: { userId },
     })
 

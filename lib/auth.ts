@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
-import { prisma } from './prisma'
+import { getPrisma } from './prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'transcrilab-dev-secret-change-in-production'
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000 // 7 days
@@ -36,7 +36,7 @@ export async function createSession(userId: string): Promise<string> {
   const token = generateToken({ userId, email: '', name: '' })
   const expiresAt = new Date(Date.now() + SESSION_DURATION)
 
-  await prisma.session.create({
+  await getPrisma().session.create({
     data: {
       token,
       userId,
@@ -57,7 +57,7 @@ export async function getSession(): Promise<JWTPayload | null> {
   if (!payload) return null
 
   // Verify session exists in DB and is not expired
-  const session = await prisma.session.findUnique({
+  const session = await getPrisma().session.findUnique({
     where: { token },
     include: { user: true },
   })
@@ -77,7 +77,7 @@ export async function getCurrentUser() {
   const session = await getSession()
   if (!session) return null
 
-  const user = await prisma.user.findUnique({
+  const user = await getPrisma().user.findUnique({
     where: { id: session.userId },
     select: {
       id: true,
@@ -93,14 +93,14 @@ export async function getCurrentUser() {
 }
 
 export async function destroySession(token: string): Promise<void> {
-  await prisma.session.deleteMany({
+  await getPrisma().session.deleteMany({
     where: { token },
   })
 }
 
 export async function generatePasswordResetToken(userId: string): Promise<string> {
   // Invalidate existing tokens
-  await prisma.passwordResetToken.updateMany({
+  await getPrisma().passwordResetToken.updateMany({
     where: { userId, used: false },
     data: { used: true },
   })
@@ -109,7 +109,7 @@ export async function generatePasswordResetToken(userId: string): Promise<string
   const token = jwt.sign({ userId, type: 'password-reset' }, JWT_SECRET, { expiresIn: '1h' })
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
-  await prisma.passwordResetToken.create({
+  await getPrisma().passwordResetToken.create({
     data: {
       token,
       userId,
@@ -121,7 +121,7 @@ export async function generatePasswordResetToken(userId: string): Promise<string
 }
 
 export async function verifyPasswordResetToken(token: string): Promise<string | null> {
-  const resetToken = await prisma.passwordResetToken.findUnique({
+  const resetToken = await getPrisma().passwordResetToken.findUnique({
     where: { token },
   })
 
@@ -133,7 +133,7 @@ export async function verifyPasswordResetToken(token: string): Promise<string | 
 }
 
 export async function consumePasswordResetToken(token: string): Promise<void> {
-  await prisma.passwordResetToken.update({
+  await getPrisma().passwordResetToken.update({
     where: { token },
     data: { used: true },
   })
