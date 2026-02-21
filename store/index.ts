@@ -33,3 +33,7 @@ export {
   useRecordingSegments,
   useRecordingDuration,
 } from './useRecordingStore'
+
+// User Store
+export { useUserStore } from './useUserStore'
+export type { UserProfile } from './useUserStore'

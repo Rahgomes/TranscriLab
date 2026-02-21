@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
+import { TopBar } from './TopBar'
 import { GridBackground } from '@/components/ui/grid-background'
 import { RecordingOverlay } from '@/features/realtime'
 
@@ -15,8 +16,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen bg-background">
       <Sidebar />
       <MobileNav />
+      <TopBar />
       <main
-        className="pt-14 md:pt-0 min-h-screen transition-all duration-300 md:pl-16"
+        className="pt-14 min-h-screen transition-all duration-300 md:pl-16"
       >
         <GridBackground className="min-h-screen">
           <div className="mx-auto w-[90%] py-6 md:py-8">

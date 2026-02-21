@@ -23,8 +23,16 @@ const navItems = [
   },
   {
     href: "/history",
-    label: "Historico",
+    label: "Histórico",
     icon: "history",
+  },
+];
+
+const bottomNavItems = [
+  {
+    href: "/settings",
+    label: "Configurações",
+    icon: "settings",
   },
 ];
 
@@ -143,6 +151,59 @@ export function Sidebar() {
             sidebarOpen ? "items-stretch" : "items-center",
           )}
         >
+          {/* Settings link */}
+          {bottomNavItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+            const linkContent = (
+              <Link
+                href={item.href}
+                className={cn(
+                  "relative flex items-center rounded-xl transition-all duration-200 group/sidebar",
+                  "hover:bg-accent",
+                  isActive && "bg-accent text-primary shadow-sm",
+                  sidebarOpen ? "h-11 px-3 gap-3" : "h-11 w-11 justify-center",
+                )}
+              >
+                <Icon
+                  name={item.icon}
+                  size="lg"
+                  fill={isActive ? 1 : 0}
+                  weight={isActive ? 500 : 400}
+                  className={cn(
+                    "transition-colors flex-shrink-0",
+                    isActive ? "text-primary" : "text-muted-foreground",
+                  )}
+                />
+                <motion.span
+                  animate={{
+                    display: sidebarOpen ? "inline-block" : "none",
+                    opacity: sidebarOpen ? 1 : 0,
+                  }}
+                  transition={{ duration: 0.2 }}
+                  className={cn(
+                    "text-sm font-medium whitespace-pre group-hover/sidebar:translate-x-1 transition duration-150",
+                    isActive ? "text-primary" : "text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </motion.span>
+                {!sidebarOpen && <span className="sr-only">{item.label}</span>}
+              </Link>
+            );
+
+            if (sidebarOpen) {
+              return <div key={item.href}>{linkContent}</div>;
+            }
+
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+
           {/* Theme toggle */}
           <Tooltip>
             <TooltipTrigger asChild>
