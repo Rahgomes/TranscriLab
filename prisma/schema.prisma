@@ -47,8 +47,10 @@ model User {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  sessions      Session[]
-  resetTokens   PasswordResetToken[]
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
+  categories     Category[]
+  transcriptions Transcription[]
 
   @@index([email])
   @@map("users")
@@ -91,8 +93,12 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   transcriptions Transcription[]
 
+  @@index([userId])
   @@map("categories")
 }
 
@@ -114,6 +120,9 @@ model Transcription {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
 
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
@@ -126,6 +135,7 @@ model Transcription {
   hasEvents       Boolean             @default(false)
   source          String?             @default("upload") @db.VarChar(20)
 
+  @@index([userId])
   @@index([categoryId])
   @@index([createdAt(sort: Desc)])
   @@index([fileName])

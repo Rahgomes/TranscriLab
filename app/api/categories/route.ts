@@ -2,19 +2,37 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, dbUnavailableResponse } from '@/lib/api'
 import { mapCategoryToHistoryCategory } from '@/lib/mappers'
+import { getSession } from '@/lib/auth'
 
 export async function GET() {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
+    // Buscar categorias do usuário + categorias padrão (sem dono)
     const categories = await prisma.category.findMany({
+      where: {
+        OR: [
+          { userId: session.userId },
+          { userId: null, isDefault: true },
+        ],
+      },
       orderBy: [
         { isDefault: 'desc' },
         { createdAt: 'asc' },
       ],
       include: {
         _count: {
-          select: { transcriptions: true },
+          select: {
+            transcriptions: {
+              where: { userId: session.userId },
+            },
+          },
         },
       },
     })
@@ -36,6 +54,12 @@ export async function POST(request: NextRequest) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const body = await request.json()
     const { name, color } = body
 
@@ -52,6 +76,7 @@ export async function POST(request: NextRequest) {
         name,
         color,
         isDefault: false,
+        userId: session.userId,
       },
     })
 

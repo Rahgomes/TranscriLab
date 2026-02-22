@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
 import { mapTranscriptionToHistoryItem, mapSegments, mapEvents } from '@/lib/mappers'
+import { getSession } from '@/lib/auth'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -9,10 +10,19 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
 
-    const transcription = await prisma.transcription.findUnique({
-      where: { id },
+    const transcription = await prisma.transcription.findFirst({
+      where: {
+        id,
+        userId: session.userId,
+      },
       include: {
         category: true,
         summary: true,
@@ -44,12 +54,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
     const body = await request.json()
     const { fileName, categoryId } = body
 
-    // Verificar se existe
-    const existing = await prisma.transcription.findUnique({ where: { id } })
+    // Verificar se existe E pertence ao usuário
+    const existing = await prisma.transcription.findFirst({
+      where: { id, userId: session.userId },
+    })
     if (!existing) {
       return notFoundResponse('Transcricao')
     }
@@ -64,7 +82,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (categoryId !== undefined) {
       // null = remover categoria, string = atribuir categoria
       if (categoryId !== null) {
-        const category = await prisma.category.findUnique({ where: { id: categoryId } })
+        const category = await prisma.category.findFirst({
+          where: {
+            id: categoryId,
+            OR: [
+              { userId: session.userId },
+              { userId: null, isDefault: true },
+            ],
+          },
+        })
         if (!category) {
           return errorResponse('Categoria nao encontrada', 404)
         }
@@ -96,9 +122,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
 
-    const existing = await prisma.transcription.findUnique({ where: { id } })
+    const existing = await prisma.transcription.findFirst({
+      where: { id, userId: session.userId },
+    })
     if (!existing) {
       return notFoundResponse('Transcricao')
     }

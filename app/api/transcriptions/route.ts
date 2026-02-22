@@ -3,11 +3,18 @@ import type { AudioEventType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseSearchParams, dbUnavailableResponse } from '@/lib/api'
 import { mapTranscriptionToHistoryItem } from '@/lib/mappers'
+import { getSession } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const body = await request.json()
     const {
       fileName,
@@ -30,9 +37,17 @@ export async function POST(request: NextRequest) {
       return errorResponse('Campos obrigatorios: fileName, originalFileName, fileSize, transcription')
     }
 
-    // Validar categoria se fornecida
+    // Validar categoria se fornecida (deve pertencer ao usuário)
     if (categoryId) {
-      const category = await prisma.category.findUnique({ where: { id: categoryId } })
+      const category = await prisma.category.findFirst({
+        where: {
+          id: categoryId,
+          OR: [
+            { userId: session.userId },
+            { userId: null, isDefault: true },
+          ],
+        },
+      })
       if (!category) {
         return errorResponse('Categoria nao encontrada', 404)
       }
@@ -54,6 +69,7 @@ export async function POST(request: NextRequest) {
         speakerCount: speakerCount ?? null,
         hasEvents: hasEvents ?? false,
         source: source ?? 'upload',
+        userId: session.userId,
         segments: Array.isArray(segments) && segments.length > 0
           ? {
               createMany: {
@@ -101,12 +117,20 @@ export async function GET(request: NextRequest) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { searchParams } = new URL(request.url)
     const { search, categoryId, sortBy, sortOrder, cursor, limit } =
       parseSearchParams(searchParams)
 
-    // Montar filtros
-    const where: Record<string, unknown> = {}
+    // Montar filtros - SEMPRE filtrar por userId
+    const where: Record<string, unknown> = {
+      userId: session.userId,
+    }
 
     if (categoryId) {
       where.categoryId = categoryId

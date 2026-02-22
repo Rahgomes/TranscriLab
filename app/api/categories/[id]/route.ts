@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
 import { mapCategoryToHistoryCategory } from '@/lib/mappers'
+import { getSession } from '@/lib/auth'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -9,11 +10,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
     const body = await request.json()
     const { name, color } = body
 
-    const existing = await prisma.category.findUnique({ where: { id } })
+    // Verificar se existe E pertence ao usuário (não pode editar categorias padrão)
+    const existing = await prisma.category.findFirst({
+      where: {
+        id,
+        userId: session.userId,
+        isDefault: false,
+      },
+    })
     if (!existing) {
       return notFoundResponse('Categoria')
     }
@@ -51,9 +65,22 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   if (!prisma) return dbUnavailableResponse()
 
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
 
-    const existing = await prisma.category.findUnique({ where: { id } })
+    // Verificar se existe E pertence ao usuário (não pode deletar categorias padrão)
+    const existing = await prisma.category.findFirst({
+      where: {
+        id,
+        userId: session.userId,
+        isDefault: false,
+      },
+    })
     if (!existing) {
       return notFoundResponse('Categoria')
     }

@@ -2,11 +2,18 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { openai } from '@/lib/openai'
 import { jsonResponse, errorResponse } from '@/lib/api'
+import { getSession } from '@/lib/auth'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    // Verificar autenticação
+    const session = await getSession()
+    if (!session) {
+      return errorResponse('Não autenticado', 401)
+    }
+
     const { id } = await params
     const body = await request.json().catch(() => ({}))
     const { transcriptionText } = body as { transcriptionText?: string }
@@ -17,9 +24,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Client sent transcription data directly (localStorage-first mode)
       text = transcriptionText
     } else if (prisma) {
-      // Fetch from DB (original behavior)
-      const transcription = await prisma.transcription.findUnique({
-        where: { id },
+      // Fetch from DB - verificar ownership
+      const transcription = await prisma.transcription.findFirst({
+        where: { id, userId: session.userId },
         select: { transcription: true },
       })
 
