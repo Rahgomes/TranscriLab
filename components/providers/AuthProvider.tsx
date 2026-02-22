@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   const setProfile = useUserStore((s) => s.setProfile)
   const resetProfile = useUserStore((s) => s.reset)
 
@@ -38,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me')
+      const res = await fetch('/api/auth/me', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setUser(data.user)
@@ -47,11 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.user.email,
           avatarUrl: data.user.avatarUrl,
         })
+        return data.user
       } else {
         setUser(null)
+        return null
       }
     } catch {
       setUser(null)
+      return null
     }
   }, [setProfile])
 
@@ -67,22 +71,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Redirect based on auth state
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || isRedirecting) return
 
     if (!user && !isPublicRoute) {
       // Not authenticated and trying to access protected route
+      setIsRedirecting(true)
       router.push('/login')
     } else if (user && isPublicRoute && pathname !== '/reset-password') {
       // Authenticated and trying to access auth pages (except reset-password)
+      setIsRedirecting(true)
       router.push('/')
     }
-  }, [user, isLoading, isPublicRoute, pathname, router])
+  }, [user, isLoading, isPublicRoute, pathname, router, isRedirecting])
+
+  // Reset redirecting state when pathname changes
+  useEffect(() => {
+    setIsRedirecting(false)
+  }, [pathname])
 
   const login = async (email: string, password: string) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     })
 
     const data = await res.json()
@@ -91,12 +103,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Erro ao fazer login')
     }
 
+    // Set user state immediately
     setUser(data.user)
     setProfile({
       name: data.user.name,
       email: data.user.email,
       avatarUrl: data.user.avatarUrl,
     })
+
+    // Return the user so caller knows login succeeded
+    return data.user
   }
 
   const signup = async (name: string, email: string, password: string) => {
@@ -104,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password }),
+      credentials: 'include',
     })
 
     const data = await res.json()
@@ -118,10 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       avatarUrl: data.user.avatarUrl,
     })
+
+    return data.user
   }
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     setUser(null)
     resetProfile()
     router.push('/login')
@@ -136,6 +155,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             T
           </div>
           <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading while redirecting
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl animate-pulse">
+            T
+          </div>
+          <p className="text-muted-foreground">Redirecionando...</p>
         </div>
       </div>
     )
