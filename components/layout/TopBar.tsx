@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { motion } from 'motion/react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,9 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Icon } from '@/components/ui/icon'
 import { useAuth } from '@/components/providers/AuthProvider'
+import { useUIStore } from '@/store'
 
 export function TopBar() {
   const { user, logout } = useAuth()
+  const sidebarOpen = useUIStore((state) => state.sidebarOpen)
 
   const getInitials = () => {
     if (!user?.name) return 'U'
@@ -25,7 +28,16 @@ export function TopBar() {
   }
 
   return (
-    <header className="hidden md:block fixed top-0 right-0 left-16 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
+    <motion.header 
+      className="hidden md:block fixed top-0 right-0 z-40 h-14 border-b bg-background/80 backdrop-blur-sm"
+      animate={{
+        left: sidebarOpen ? 224 : 64,
+      }}
+      transition={{
+        duration: 0.2,
+        ease: 'easeInOut',
+      }}
+    >
       <div className="flex h-full items-center justify-between px-4 md:px-6">
         {/* Left side - can add breadcrumbs or page title later */}
         <div className="flex items-center gap-2">
@@ -83,6 +95,6 @@ export function TopBar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
+    </motion.header>
   )
 }
