@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,9 +17,9 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "TranscriLab - Transcricao de Audio com IA",
+  title: "TranscriLab - Transcrição de Áudio com IA",
   description:
-    "Converta audio em texto com inteligencia artificial. Transcreva, resuma e organize suas gravacoes.",
+    "Converta áudio em texto com inteligência artificial. Transcreva, resuma e organize suas gravações.",
 };
 
 export default function RootLayout({
@@ -35,7 +36,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Toaster richColors position="top-center" />
       </body>
     </html>

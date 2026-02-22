@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPrisma } from '@/lib/prisma'
 import { hashPassword, createSession } from '@/lib/auth'
+import { sendWelcomeEmail } from '@/lib/email'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
@@ -56,6 +57,11 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
+    })
+
+    // Send welcome email (async, don't wait)
+    sendWelcomeEmail(user.email, user.name).catch(err => {
+      console.error('Failed to send welcome email:', err)
     })
 
     return NextResponse.json({

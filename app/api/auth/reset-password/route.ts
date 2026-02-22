@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPrisma } from '@/lib/prisma'
 import { verifyPasswordResetToken, consumePasswordResetToken, hashPassword } from '@/lib/auth'
+import { sendPasswordChangedEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get user info before update
+    const user = await getPrisma().user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado' },
+        { status: 404 }
+      )
+    }
+
     // Update password
     const passwordHash = await hashPassword(password)
     await getPrisma().user.update({
@@ -43,6 +56,11 @@ export async function POST(request: NextRequest) {
     // Invalidate all sessions for this user
     await getPrisma().session.deleteMany({
       where: { userId },
+    })
+
+    // Send confirmation email (async)
+    sendPasswordChangedEmail(user.email, user.name).catch(err => {
+      console.error('Failed to send password changed email:', err)
     })
 
     return NextResponse.json({

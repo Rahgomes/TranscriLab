@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Icon } from '@/components/ui/icon'
-import { useUserStore } from '@/store'
+import { useAuth } from '@/components/providers/AuthProvider'
 
 export default function LoginPage() {
   const router = useRouter()
-  const setProfile = useUserStore((s) => s.setProfile)
+  const { login } = useAuth()
   
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,25 +25,7 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao fazer login')
-      }
-
-      // Update user store
-      setProfile({
-        name: data.user.name,
-        email: data.user.email,
-        avatarUrl: data.user.avatarUrl,
-      })
-
+      await login(email, password)
       toast.success('Login realizado com sucesso!')
       router.push('/')
     } catch (error) {

@@ -23,9 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useHistoryCount, useUserStore } from '@/store'
+import { useHistoryCount } from '@/store'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { RecordButton } from '@/features/realtime'
+import { useAuth } from '@/components/providers/AuthProvider'
 
 const navItems = [
   {
@@ -50,8 +51,14 @@ export function MobileNav() {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const count = useHistoryCount()
-  const profile = useUserStore((s) => s.profile)
-  const getInitials = useUserStore((s) => s.getInitials)
+  const { user, logout } = useAuth()
+
+  const getInitials = () => {
+    if (!user?.name) return 'U'
+    const parts = user.name.trim().split(' ')
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+  }
 
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex h-14 items-center border-b bg-background/80 backdrop-blur-sm px-4">
@@ -75,15 +82,15 @@ export function MobileNav() {
           {/* User info in sheet */}
           <div className="mt-6 flex items-center gap-3 px-2 py-3 rounded-xl bg-muted/50">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={profile.avatarUrl} alt={profile.name} />
+              <AvatarImage src={user?.avatarUrl || undefined} alt={user?.name || ''} />
               <AvatarFallback className="bg-primary/10 text-primary font-medium">
                 {getInitials()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{profile.name}</p>
-              {profile.email && (
-                <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+              <p className="text-sm font-medium truncate">{user?.name || 'Usuário'}</p>
+              {user?.email && (
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               )}
             </div>
           </div>
@@ -128,6 +135,18 @@ export function MobileNav() {
                 <RecordButton variant="mobile-nav" />
               </div>
             </div>
+
+            {/* Logout button */}
+            <button
+              onClick={() => {
+                setOpen(false)
+                logout()
+              }}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all duration-200"
+            >
+              <Icon name="logout" size="md" className="text-red-600" />
+              <span className="font-medium">Sair</span>
+            </button>
           </nav>
 
           {/* Theme toggle at bottom of sheet */}
@@ -151,7 +170,7 @@ export function MobileNav() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={profile.avatarUrl} alt={profile.name} />
+              <AvatarImage src={user?.avatarUrl || undefined} alt={user?.name || ''} />
               <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                 {getInitials()}
               </AvatarFallback>
@@ -161,10 +180,10 @@ export function MobileNav() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{profile.name}</p>
-              {profile.email && (
+              <p className="text-sm font-medium leading-none">{user?.name}</p>
+              {user?.email && (
                 <p className="text-xs leading-none text-muted-foreground">
-                  {profile.email}
+                  {user.email}
                 </p>
               )}
             </div>
@@ -183,9 +202,9 @@ export function MobileNav() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-muted-foreground cursor-not-allowed opacity-50">
+          <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
             <Icon name="logout" size="sm" className="mr-2" />
-            Sair (em breve)
+            Sair
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

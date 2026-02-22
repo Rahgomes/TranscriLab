@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Icon } from '@/components/ui/icon'
-import { useUserStore } from '@/store'
+import { useAuth } from '@/components/providers/AuthProvider'
 
 export default function SignupPage() {
   const router = useRouter()
-  const setProfile = useUserStore((s) => s.setProfile)
+  const { signup } = useAuth()
   
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -38,25 +38,7 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao criar conta')
-      }
-
-      // Update user store
-      setProfile({
-        name: data.user.name,
-        email: data.user.email,
-        avatarUrl: data.user.avatarUrl,
-      })
-
+      await signup(name, email, password)
       toast.success('Conta criada com sucesso!')
       router.push('/')
     } catch (error) {
