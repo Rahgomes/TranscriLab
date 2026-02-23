@@ -26,6 +26,11 @@ const navItems = [
     label: "Histórico",
     icon: "history",
   },
+  {
+    href: "/dashboard/usage",
+    label: "Dashboard",
+    icon: "analytics",
+  },
 ];
 
 const bottomNavItems = [
@@ -87,7 +92,7 @@ export function Sidebar() {
           )}
         >
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             const linkContent = (
               <Link

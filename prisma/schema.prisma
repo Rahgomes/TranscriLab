@@ -51,6 +51,7 @@ model User {
   resetTokens    PasswordResetToken[]
   categories     Category[]
   transcriptions Transcription[]
+  apiUsage       ApiUsage[]
 
   @@index([email])
   @@map("users")
@@ -241,4 +242,48 @@ model AudioFile {
   transcription   Transcription @relation(fields: [transcriptionId], references: [id], onDelete: Cascade)
 
   @@map("audio_files")
+}
+
+// === API Usage Tracking ===
+
+enum ApiProvider {
+  OPENAI
+  GROQ
+}
+
+enum ApiOperation {
+  TRANSCRIPTION
+  SUMMARY
+  DERIVED_CONTENT
+  CHAT
+}
+
+model ApiUsage {
+  id          String       @id @default(uuid())
+  provider    ApiProvider
+  operation   ApiOperation
+  model       String       @db.VarChar(100)
+  
+  // Métricas
+  inputTokens   Int        @default(0) @map("input_tokens")
+  outputTokens  Int        @default(0) @map("output_tokens")
+  totalTokens   Int        @default(0) @map("total_tokens")
+  audioDuration Float?     @map("audio_duration") // segundos (para Whisper)
+  
+  // Custo estimado (em USD)
+  estimatedCost Float      @default(0) @map("estimated_cost")
+  
+  // Metadados
+  metadata    Json?        @db.JsonB
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  // Relação com usuário
+  userId      String       @map("user_id")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, provider])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("api_usage")
 }
