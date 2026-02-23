@@ -26,7 +26,7 @@ import {
   CategoryBadge,
   AudioPlayerWithLoader,
   SegmentedTranscript,
-  SpeakersList,
+  SpeakerManager,
   useSegments,
 } from '@/features/history'
 import { EditableSegmentedTranscript } from '@/features/history/components/EditableSegmentedTranscript'
@@ -617,8 +617,17 @@ export default function TranscriptionDetailPage() {
                   </Card>
                 )}
 
-                {/* Speakers list */}
-                {hasDiarization && <SpeakersList speakers={speakers} />}
+                {/* Speakers management */}
+                {hasDiarization && (
+                  <SpeakerManager
+                    speakers={speakers}
+                    transcriptionId={item.id}
+                    onUpdate={() => {
+                      // Forçar reload dos segmentos/speakers
+                      router.refresh()
+                    }}
+                  />
+                )}
 
                 {/* Audio events list */}
                 {events.length > 0 && (
