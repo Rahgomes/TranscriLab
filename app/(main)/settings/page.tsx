@@ -14,6 +14,12 @@ const settingsItems = [
     href: '/settings/profile',
   },
   {
+    title: 'Chaves de API',
+    description: 'Configure suas chaves OpenAI, Groq, etc.',
+    icon: 'key',
+    href: '/settings/api-keys',
+  },
+  {
     title: 'Aparência',
     description: 'Tema claro, escuro ou automático',
     icon: 'palette',
