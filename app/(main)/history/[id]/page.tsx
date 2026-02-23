@@ -41,6 +41,7 @@ import { DeriveActionsCard } from '@/features/history/components/DeriveActionsCa
 import { DerivedContentList } from '@/features/history/components/DerivedContentList'
 import { findActiveSegmentIndex } from '@/lib/segments'
 import { findActiveEventIndex } from '@/lib/audioEvents'
+import { ExportDialog, prepareExportData } from '@/features/export'
 
 export default function TranscriptionDetailPage() {
   const params = useParams()
@@ -67,6 +68,7 @@ export default function TranscriptionDetailPage() {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
   const [showHistorySheet, setShowHistorySheet] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
 
   const audioPlayerRef = useRef<AudioPlayerHandle>(null)
   const item = items.find((i) => i.id === id)
@@ -309,32 +311,7 @@ export default function TranscriptionDetailPage() {
   }
 
   function handleExport() {
-    if (!item) return
-
-    let transcriptionContent = item.transcription
-
-    // Se tiver diarizacao e segmentos carregados, exporta com speakers e timestamps
-    if (item.hasDiarization && segments.length > 0) {
-      transcriptionContent = segments
-        .map((s) => {
-          const mins = Math.floor(s.startTime / 60)
-          const secs = Math.floor(s.startTime % 60)
-          const ts = `${mins}:${secs.toString().padStart(2, '0')}`
-          return `[${ts}] **Speaker ${s.speaker}**: ${s.text}`
-        })
-        .join('\n\n')
-    }
-
-    const content = `# ${item.fileName}\n\nData: ${new Date(item.createdAt).toLocaleString('pt-BR')}\n${item.hasDiarization ? `Falantes: ${item.speakerCount ?? 'N/A'}\n` : ''}\n## Transcricao\n\n${transcriptionContent}${item.summary ? `\n\n## Resumo\n\n${item.summary.summary}\n\n## Insights\n\n${item.summary.insights.map((i) => `- ${i}`).join('\n')}` : ''}`
-
-    const blob = new Blob([content], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${item.fileName.replace(/\.[^/.]+$/, '')}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success('Arquivo exportado!')
+    setShowExportDialog(true)
   }
 
   async function handleShare() {
@@ -761,6 +738,15 @@ export default function TranscriptionDetailPage() {
         onClearSelectedVersion={versionHistory.clearSelectedVersion}
         currentTranscriptionText={item.transcription}
         currentSegments={segments.map((s) => ({ index: s.index, speaker: s.speaker, text: s.text }))}
+      />
+
+      {/* Export dialog */}
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        data={prepareExportData(item, segments)}
+        hasDiarization={!!hasDiarization}
+        hasSummary={!!item.summary}
       />
     </div>
   )
