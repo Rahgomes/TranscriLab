@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { openai } from '@/lib/openai'
 import { jsonResponse, errorResponse, notFoundResponse, dbUnavailableResponse } from '@/lib/api'
 import { getSession } from '@/lib/auth'
+import { trackLLMUsage } from '@/features/dashboard/lib/trackUsage'
 import type { DerivedContentType } from '@prisma/client'
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -53,6 +54,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const content = completion.choices[0]?.message?.content || ''
     const tokensUsed = completion.usage?.total_tokens || 0
+    const inputTokens = completion.usage?.prompt_tokens || 0
+    const outputTokens = completion.usage?.completion_tokens || 0
+
+    // Registrar uso da API
+    await trackLLMUsage(
+      session.userId,
+      'OPENAI',
+      'DERIVED_CONTENT',
+      'gpt-4o-mini',
+      inputTokens,
+      outputTokens,
+      { transcriptionId: id, contentType: type }
+    )
 
     const derived = await prisma.derivedContent.create({
       data: {

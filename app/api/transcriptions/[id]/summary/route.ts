@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { openai } from '@/lib/openai'
 import { jsonResponse, errorResponse } from '@/lib/api'
 import { getSession } from '@/lib/auth'
+import { trackLLMUsage } from '@/features/dashboard/lib/trackUsage'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -73,7 +74,20 @@ Responda APENAS com JSON valido, sem markdown ou formatacao adicional.`,
 
     const result = JSON.parse(content)
     const tokensUsed = completion.usage?.total_tokens || 0
+    const inputTokens = completion.usage?.prompt_tokens || 0
+    const outputTokens = completion.usage?.completion_tokens || 0
     const generatedAt = new Date().toISOString()
+
+    // Registrar uso da API
+    await trackLLMUsage(
+      session.userId,
+      'OPENAI',
+      'SUMMARY',
+      'gpt-4o-mini',
+      inputTokens,
+      outputTokens,
+      { transcriptionId: id }
+    )
 
     // Try to save to DB (optional — if it fails, still return the content)
     if (prisma) {

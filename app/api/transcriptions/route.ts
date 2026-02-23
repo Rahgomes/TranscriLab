@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { jsonResponse, errorResponse, parseSearchParams, dbUnavailableResponse } from '@/lib/api'
 import { mapTranscriptionToHistoryItem } from '@/lib/mappers'
 import { getSession } from '@/lib/auth'
+import { trackTranscription } from '@/features/dashboard/lib/trackUsage'
 
 export async function POST(request: NextRequest) {
   if (!prisma) return dbUnavailableResponse()
@@ -104,6 +105,19 @@ export async function POST(request: NextRequest) {
         summary: true,
       },
     })
+
+    // Registrar uso da API de transcrição (se tiver duration)
+    if (duration && duration > 0) {
+      // Determinar provider/model baseado na source
+      const isRealtime = source === 'realtime'
+      await trackTranscription(
+        session.userId,
+        isRealtime ? 'GROQ' : 'OPENAI',
+        isRealtime ? 'whisper-large-v3-turbo' : 'gpt-4o-transcribe-diarize',
+        duration,
+        { transcriptionId: created.id, source: source ?? 'upload' }
+      )
+    }
 
     // Type assertion needed because Prisma loses type inference with complex conditional createMany
     return jsonResponse(mapTranscriptionToHistoryItem(created as typeof created & { category: typeof created.category; summary: typeof created.summary }), 201)
