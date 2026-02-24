@@ -24,8 +24,9 @@ COPY . .
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 
-# Build Next.js
+# Build Next.js with database enabled
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_DATABASE_ENABLED=true
 RUN npm run build
 
 # Production image
