@@ -41,6 +41,11 @@ const navItems = [
     showBadge: true,
   },
   {
+    href: '/dashboard/usage',
+    label: 'Dashboard',
+    icon: 'bar_chart',
+  },
+  {
     href: '/settings',
     label: 'Configurações',
     icon: 'settings',
