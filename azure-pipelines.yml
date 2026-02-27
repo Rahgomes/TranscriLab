@@ -1,0 +1,79 @@
+# Azure Pipeline - Nexa Lume Digital
+# Trigger: push em main ou develop
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - name: isMain
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+  - name: isDevelop
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/develop')]
+
+stages:
+  # ========== BUILD ==========
+  - stage: Build
+    displayName: '🔨 Build'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Next.js'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+            displayName: 'Instalar Node.js'
+
+          - script: |
+              npm ci
+              npm run build
+            displayName: 'Instalar deps e Build'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '.next'
+              artifactName: 'nextjs-build'
+            displayName: 'Publicar Artefatos'
+
+  # ========== DEPLOY DEV ==========
+  - stage: DeployDev
+    displayName: '🧪 Deploy Dev'
+    dependsOn: Build
+    condition: eq(variables.isDevelop, true)
+    jobs:
+      - deployment: DeployToDev
+        displayName: 'Deploy para Development'
+        environment: 'Development'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    echo "🚀 Deploying to Development..."
+                    # Webhook para Coolify ou SSH deploy
+                    # curl -X POST "$COOLIFY_WEBHOOK_DEV"
+                  displayName: 'Deploy Dev'
+
+  # ========== DEPLOY PROD ==========
+  - stage: DeployProd
+    displayName: '🚀 Deploy Prod'
+    dependsOn: Build
+    condition: eq(variables.isMain, true)
+    jobs:
+      - deployment: DeployToProd
+        displayName: 'Deploy para Production'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    echo "🚀 Deploying to Production..."
+                    # Webhook para Coolify
+                    # curl -X POST "$COOLIFY_WEBHOOK_PROD"
+                  displayName: 'Deploy Prod'
